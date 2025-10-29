@@ -103,43 +103,7 @@
             console.log('Proxy:', message);
         }
 
-        // CORS Proxy function
-        async function makeCORSRequest(url, options) {
-            // Try multiple CORS proxies
-            const corsProxies = [
-                'https://cors-anywhere.herokuapp.com/',
-                'https://api.codetabs.com/v1/proxy?quest=',
-                'https://corsproxy.io/?',
-                'https://proxy.cors.sh/'
-            ];
-
-            for (const proxy of corsProxies) {
-                try {
-                    updateStatus(`Trying proxy: ${proxy}...`);
-                    const proxyUrl = proxy + encodeURIComponent(url);
-                    
-                    const response = await fetch(proxyUrl, {
-                        ...options,
-                        headers: {
-                            ...options.headers,
-                            'X-Requested-With': 'XMLHttpRequest'
-                        }
-                    });
-
-                    if (response.ok) {
-                        updateStatus(`Proxy ${proxy} worked!`);
-                        return response;
-                    }
-                } catch (error) {
-                    console.log(`Proxy ${proxy} failed:`, error.message);
-                    continue;
-                }
-            }
-            
-            throw new Error('All CORS proxies failed');
-        }
-
-        // Main connection function
+        // Direct server connection without CORS
         async function connectToServer() {
             try {
                 updateStatus('Preparing request...');
@@ -148,74 +112,8 @@
                     throw new Error('System ID is required for key generation');
                 }
 
-                const payload = {
-                    action: action,
-                    system_id: systemId,
-                    duration: duration,
-                    vendor_password: 'VENDOR123'
-                };
-
-                updateStatus('Sending request via CORS proxy...');
-                
-                const serverUrl = 'http://myactivation.infinityfreeapp.com/validate.php';
-                
-                // Try direct fetch first (might work in some browsers)
-                try {
-                    updateStatus('Trying direct connection...');
-                    const directResponse = await fetch(serverUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (directResponse.ok) {
-                        const result = await directResponse.json();
-                        updateStatus('Direct connection successful!', false, true);
-                        sendSuccess(result);
-                        return;
-                    }
-                } catch (directError) {
-                    console.log('Direct connection failed, trying CORS proxy...');
-                }
-
-                // If direct failed, try CORS proxy
-                updateStatus('Direct connection failed, trying CORS proxies...');
-                
-                const response = await makeCORSRequest(serverUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(payload)
-                });
-
-                updateStatus('Processing server response...');
-
-                const textResponse = await response.text();
-                console.log('Raw response:', textResponse);
-                
-                let data;
-                try {
-                    data = JSON.parse(textResponse);
-                } catch (parseError) {
-                    throw new Error(`Invalid JSON response: ${textResponse}`);
-                }
-                
-                // Handle different response types
-                if (data.status === 'active') {
-                    // Server is active but returned status instead of key data
-                    // This means we need to handle key generation differently
-                    if (action === 'generate') {
-                        updateStatus('Server active, but key generation endpoint may be different', false, false, true);
-                        // Try alternative approach or use local generation
-                        await handleKeyGeneration();
-                        return;
-                    }
-                }
-                
-                sendSuccess(data);
+                // Use JSONP approach for cross-origin requests
+                await jsonpRequest();
 
             } catch (error) {
                 console.error('Connection Error:', error);
@@ -231,41 +129,122 @@
             }
         }
 
-        // Handle key generation specifically
-        async function handleKeyGeneration() {
-            try {
-                updateStatus('Attempting key generation...', false, false, true);
+        // JSONP approach for cross-origin requests
+        function jsonpRequest() {
+            return new Promise((resolve, reject) => {
+                updateStatus('Trying JSONP method...');
                 
-                // Try alternative endpoint or method
-                const generateUrl = 'http://myactivation.infinityfreeapp.com/validate.php?action=generate';
-                const payload = {
+                // Create a script tag for JSONP
+                const script = document.createElement('script');
+                const callbackName = 'jsonp_callback_' + Date.now();
+                
+                // For GET request to check server status
+                script.src = `http://myactivation.infinityfreeapp.com/validate.php?callback=${callbackName}`;
+                
+                // Define the callback function
+                window[callbackName] = function(data) {
+                    updateStatus('Server responded via JSONP!', false, true);
+                    console.log('JSONP Response:', data);
+                    
+                    // Clean up
+                    document.head.removeChild(script);
+                    delete window[callbackName];
+                    
+                    // Since JSONP only works for GET, we'll use local generation for key creation
+                    if (action === 'generate' && systemId) {
+                        handleLocalGeneration();
+                    } else {
+                        sendSuccess(data);
+                    }
+                    
+                    resolve(data);
+                };
+
+                // Error handling
+                script.onerror = function() {
+                    updateStatus('JSONP failed, server may not support it', true);
+                    document.head.removeChild(script);
+                    delete window[callbackName];
+                    
+                    // Fallback to local generation
+                    if (action === 'generate' && systemId) {
+                        handleLocalGeneration();
+                    } else {
+                        reject(new Error('JSONP request failed'));
+                    }
+                };
+
+                // Add to page
+                document.head.appendChild(script);
+                
+                // Timeout for JSONP
+                setTimeout(() => {
+                    if (window[callbackName]) {
+                        updateStatus('JSONP timeout', true);
+                        document.head.removeChild(script);
+                        delete window[callbackName];
+                        reject(new Error('JSONP timeout'));
+                    }
+                }, 10000);
+            });
+        }
+
+        // Alternative: Form submission approach
+        async function tryFormSubmission() {
+            return new Promise((resolve, reject) => {
+                updateStatus('Trying form submission method...');
+                
+                // Create a hidden form
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = 'http://myactivation.infinityfreeapp.com/validate.php';
+                form.target = 'hidden_iframe';
+                form.style.display = 'none';
+                
+                // Add form fields
+                const fields = {
+                    action: action,
                     system_id: systemId,
                     duration: duration,
                     vendor_password: 'VENDOR123'
                 };
-
-                const response = await makeCORSRequest(generateUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                    },
-                    body: JSON.stringify(payload)
-                });
-
-                const result = await response.json();
                 
-                if (result.success) {
-                    sendSuccess(result);
-                } else {
-                    throw new Error(result.error || 'Key generation failed');
+                for (const [key, value] of Object.entries(fields)) {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = key;
+                    input.value = value;
+                    form.appendChild(input);
                 }
-
-            } catch (generateError) {
-                console.error('Key generation failed:', generateError);
-                updateStatus('Key generation failed, using local generation...', false, false, true);
-                await handleLocalGeneration();
-            }
+                
+                // Create hidden iframe
+                const iframe = document.createElement('iframe');
+                iframe.name = 'hidden_iframe';
+                iframe.style.display = 'none';
+                iframe.onload = function() {
+                    updateStatus('Form submission completed', false, true);
+                    // We can't easily read the response, so we'll use local generation
+                    if (action === 'generate' && systemId) {
+                        handleLocalGeneration();
+                    }
+                    resolve();
+                };
+                
+                iframe.onerror = function() {
+                    updateStatus('Form submission failed', true);
+                    reject(new Error('Form submission failed'));
+                };
+                
+                document.body.appendChild(iframe);
+                document.body.appendChild(form);
+                form.submit();
+                
+                // Clean up
+                setTimeout(() => {
+                    document.body.removeChild(form);
+                    document.body.removeChild(iframe);
+                }, 5000);
+            });
         }
 
         // Local key generation fallback
@@ -280,12 +259,12 @@
                     data: localKey
                 };
                 
-                updateStatus('Local key generation successful!', false, true);
+                updateStatus('✅ Local key generation successful!', false, true);
                 sendSuccess(localData);
                 
             } catch (localError) {
                 console.error('Local generation failed:', localError);
-                updateStatus(`Local generation failed: ${localError.message}`, true);
+                updateStatus(`❌ Local generation failed: ${localError.message}`, true);
                 sendError('Local key generation failed');
             }
         }
@@ -327,7 +306,8 @@
                 duration: duration,
                 system_id: systemId,
                 local_generated: true,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                note: 'This is a locally generated key. Server connection failed.'
             };
         }
 
@@ -344,7 +324,7 @@
                 setTimeout(() => {
                     updateStatus('Closing connection...');
                     window.close();
-                }, 1000);
+                }, 2000);
             } else {
                 updateStatus('Opener window not available', true);
                 setTimeout(() => window.close(), 3000);
@@ -365,15 +345,31 @@
 
         // Start connection
         document.addEventListener('DOMContentLoaded', function() {
-            updateStatus('Starting connection sequence...');
-            setTimeout(connectToServer, 500);
+            updateStatus('Starting connection...');
+            
+            // Try multiple methods in sequence
+            setTimeout(async () => {
+                try {
+                    await connectToServer();
+                } catch (error) {
+                    console.error('All connection methods failed:', error);
+                    
+                    // Final fallback - direct to local generation
+                    if (action === 'generate' && systemId) {
+                        updateStatus('All connection methods failed, using local generation...', false, false, true);
+                        await handleLocalGeneration();
+                    } else {
+                        sendError('All connection methods failed: ' + error.message);
+                    }
+                }
+            }, 1000);
         });
 
         // Timeout handling
         setTimeout(() => {
             if (!window.closed) {
-                updateStatus('Connection timeout', true);
-                sendError('Connection timeout after 30 seconds');
+                updateStatus('Overall operation timeout', true);
+                sendError('Operation timeout after 30 seconds');
             }
         }, 30000);
     </script>
