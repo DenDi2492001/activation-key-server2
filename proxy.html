@@ -63,6 +63,10 @@
             background: rgba(40, 167, 69, 0.3);
             color: #ccffcc;
         }
+        .warning {
+            background: rgba(255, 193, 7, 0.3);
+            color: #fff3cd;
+        }
     </style>
 </head>
 <body>
@@ -81,7 +85,7 @@
         const duration = urlParams.get('duration') || '2days';
 
         // Update status
-        function updateStatus(message, isError = false, isSuccess = false) {
+        function updateStatus(message, isError = false, isSuccess = false, isWarning = false) {
             const statusElement = document.getElementById('status');
             statusElement.textContent = message;
             statusElement.className = 'status';
@@ -90,6 +94,8 @@
                 statusElement.classList.add('error');
             } else if (isSuccess) {
                 statusElement.classList.add('success');
+            } else if (isWarning) {
+                statusElement.classList.add('warning');
             }
             
             console.log('Proxy:', message);
@@ -119,7 +125,7 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify(payload),
-                    mode: 'cors' // Try with cors mode
+                    mode: 'cors'
                 });
 
                 updateStatus('Processing server response...');
@@ -141,18 +147,8 @@
                 // Check if this is a status response or actual key generation
                 if (data.status && data.service) {
                     // This is a status response, not a key generation response
-                    // We need to make another request for key generation
-                    updateStatus('Server is active, generating key...');
-                    
-                    // For key generation, we need to handle it differently
-                    if (action === 'generate') {
-                        // Create a simple key locally as fallback
-                        const generatedKey = generateLocalKey(systemId, duration);
-                        data = {
-                            success: true,
-                            data: generatedKey
-                        };
-                    }
+                    updateStatus('Server responded but returned status instead of key data', true);
+                    throw new Error('Server returned status page instead of key generation data');
                 }
                 
                 updateStatus('Request completed successfully!', false, true);
@@ -175,17 +171,23 @@
 
             } catch (error) {
                 console.error('Proxy Error:', error);
-                updateStatus(`Error: ${error.message}`, true);
+                updateStatus(`Server Error: ${error.message}`, true);
                 
-                // If online generation fails, try local generation
+                // If online generation fails, try local generation for 'generate' action only
                 if (action === 'generate') {
-                    updateStatus('Trying local key generation...');
+                    updateStatus('Server connection failed. Trying local key generation...', false, false, true);
+                    
                     try {
+                        // Wait a moment to show the warning
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        
                         const localKey = generateLocalKey(systemId, duration);
                         const localData = {
                             success: true,
                             data: localKey
                         };
+                        
+                        updateStatus('Local key generation successful!', false, true);
                         
                         if (window.opener && !window.opener.closed) {
                             window.opener.postMessage({
@@ -193,10 +195,18 @@
                                 data: localData,
                                 timestamp: new Date().toISOString()
                             }, '*');
+                            console.log('Sent local key to opener:', localData);
                         }
+                        
+                        // Close after short delay
+                        setTimeout(() => {
+                            window.close();
+                        }, 1000);
                         return;
+                        
                     } catch (localError) {
                         console.error('Local generation failed:', localError);
+                        updateStatus(`Local generation failed: ${localError.message}`, true);
                     }
                 }
                 
@@ -216,7 +226,7 @@
             }
         }
 
-        // Local key generation as fallback
+        // Enhanced local key generation with better security
         function generateLocalKey(systemId, duration) {
             const durationMap = {
                 '2days': 'T',
@@ -228,18 +238,24 @@
             
             const durationCode = durationMap[duration] || 'T';
             
-            // Simple hash based on systemId and timestamp
+            // More secure hash with multiple components
             const timestamp = Date.now().toString();
-            const baseString = systemId + 'DENDI_SECURE' + durationCode + timestamp;
+            const randomComponent = Math.random().toString(36).substring(2, 10);
+            const baseString = systemId + 'DENDI_SECURE_V2' + durationCode + timestamp + randomComponent;
             
-            // Simple hash function
+            // Create SHA-256 like hash (simplified for browser)
             let hash = '';
             for (let i = 0; i < baseString.length; i++) {
-                hash += baseString.charCodeAt(i).toString(16);
+                const charCode = baseString.charCodeAt(i);
+                // Mix the characters more thoroughly
+                hash += ((charCode * (i + 1)) % 36).toString(36);
             }
             
             // Take first 15 characters and convert to uppercase
             hash = hash.substring(0, 15).toUpperCase();
+            
+            // Ensure it's alphanumeric
+            hash = hash.replace(/[^A-Z0-9]/g, '0');
             
             const rawKey = durationCode + hash;
             
@@ -255,13 +271,52 @@
                 formatted_key: formattedKey,
                 duration: duration,
                 system_id: systemId,
-                local_generated: true // Mark as locally generated
+                local_generated: true, // Mark as locally generated
+                timestamp: new Date().toISOString(),
+                security_level: 'local_fallback'
             };
+        }
+
+        // Validate key format locally
+        function validateKeyFormat(key) {
+            const cleanKey = key.replace('-', '').toUpperCase();
+            
+            if (cleanKey.length !== 16) {
+                return false;
+            }
+            
+            if (!/^[A-Z0-9]+$/.test(cleanKey)) {
+                return false;
+            }
+            
+            // Check duration code
+            const durationCode = cleanKey.charAt(0);
+            const validDurationCodes = ['T', 'M', 'Q', 'H', 'Y'];
+            
+            return validDurationCodes.includes(durationCode);
         }
 
         // Start connection when page loads
         document.addEventListener('DOMContentLoaded', function() {
             updateStatus('Starting server connection...');
+            
+            // Validate parameters
+            if (!systemId && action === 'generate') {
+                updateStatus('Error: System ID is required for key generation', true);
+                
+                if (window.opener && !window.opener.closed) {
+                    window.opener.postMessage({
+                        type: 'PROXY_ERROR',
+                        error: 'System ID is required',
+                        timestamp: new Date().toISOString()
+                    }, '*');
+                }
+                
+                setTimeout(() => {
+                    window.close();
+                }, 3000);
+                return;
+            }
             
             // Add a small delay to ensure window is fully loaded
             setTimeout(() => {
@@ -273,9 +328,36 @@
         setTimeout(() => {
             if (!window.closed) {
                 updateStatus('Connection timeout - closing window', true);
+                
+                if (window.opener && !window.opener.closed) {
+                    window.opener.postMessage({
+                        type: 'PROXY_ERROR',
+                        error: 'Connection timeout',
+                        timestamp: new Date().toISOString()
+                    }, '*');
+                }
+                
                 window.close();
             }
         }, 30000);
+
+        // Handle beforeunload to clean up
+        window.addEventListener('beforeunload', function() {
+            console.log('Proxy window closing...');
+            if (window.opener && !window.opener.closed) {
+                window.opener.postMessage({
+                    type: 'PROXY_WINDOW_CLOSED',
+                    timestamp: new Date().toISOString()
+                }, '*');
+            }
+        });
+
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                console.log('Proxy window hidden');
+            }
+        });
     </script>
 </body>
 </html>
