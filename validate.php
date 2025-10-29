@@ -1,14 +1,30 @@
 <?php
-// validate.php - Fixed JSONP Support
+// validate.php - Enhanced Version for GitHub Pages & InfinityFree
 
-// Handle JSONP requests first
+// Enable error reporting for debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+// Set headers for CORS and JSON
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, Accept, Origin');
+header('Access-Control-Allow-Credentials: true');
+header('Access-Control-Max-Age: 86400');
+header('Content-Type: application/json; charset=utf-8');
+
+// Handle preflight OPTIONS request
+if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
+    http_response_code(200);
+    exit(0);
+}
+
+// Handle JSONP requests
 if (isset($_GET['callback'])) {
     $callback = $_GET['callback'];
-    
-    // Set proper content type for JSONP
     header('Content-Type: application/javascript; charset=utf-8');
     
-    // Handle key generation
+    // Handle key generation via JSONP
     if (isset($_GET['action']) && $_GET['action'] === 'generate') {
         $system_id = isset($_GET['system_id']) ? trim($_GET['system_id']) : '';
         $duration = isset($_GET['duration']) ? $_GET['duration'] : '';
@@ -28,7 +44,7 @@ if (isset($_GET['callback'])) {
         exit;
     }
     
-    // Handle status check
+    // Handle status check via JSONP
     $data = array(
         'status' => 'active', 
         'service' => 'Activation Key Server', 
@@ -39,37 +55,51 @@ if (isset($_GET['callback'])) {
     exit;
 }
 
-// Regular CORS headers for other requests
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, Accept, Origin');
-header('Access-Control-Allow-Credentials: true');
-header('Access-Control-Max-Age: 86400');
-
-// Handle preflight OPTIONS request
-if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
-    http_response_code(200);
-    exit(0);
-}
-
 // Configuration
 $secret_key = "DENDI_SECURE_KEY_2025_V2";
 $used_keys_file = "used_keys.json";
 $activation_logs = "activation_logs.json";
 
+// Initialize files if they don't exist
+function initializeFiles() {
+    global $used_keys_file, $activation_logs;
+    
+    if (!file_exists($used_keys_file)) {
+        file_put_contents($used_keys_file, json_encode([]));
+    }
+    
+    if (!file_exists($activation_logs)) {
+        file_put_contents($activation_logs, json_encode([]));
+    }
+}
+
 // Used keys tracking functions
 function loadUsedKeys() {
     global $used_keys_file;
+    initializeFiles();
+    
     if (!file_exists($used_keys_file)) {
         return [];
     }
+    
     $data = file_get_contents($used_keys_file);
-    return json_decode($data, true) ?: [];
+    if ($data === false) {
+        return [];
+    }
+    
+    $decoded = json_decode($data, true);
+    return is_array($decoded) ? $decoded : [];
 }
 
 function saveUsedKeys($used_keys) {
     global $used_keys_file;
-    file_put_contents($used_keys_file, json_encode($used_keys));
+    
+    if (!is_array($used_keys)) {
+        $used_keys = [];
+    }
+    
+    $result = file_put_contents($used_keys_file, json_encode($used_keys));
+    return $result !== false;
 }
 
 function isKeyUsed($activation_key) {
@@ -82,7 +112,9 @@ function markKeyAsUsed($activation_key) {
     if (!in_array($activation_key, $used_keys)) {
         $used_keys[] = $activation_key;
         saveUsedKeys($used_keys);
+        return true;
     }
+    return false;
 }
 
 // Activation logging
@@ -91,7 +123,10 @@ function logActivation($system_id, $activation_key, $duration, $ip) {
     $logs = [];
     
     if (file_exists($activation_logs)) {
-        $logs = json_decode(file_get_contents($activation_logs), true) ?: [];
+        $data = file_get_contents($activation_logs);
+        if ($data !== false) {
+            $logs = json_decode($data, true) ?: [];
+        }
     }
     
     $log_entry = [
@@ -110,6 +145,7 @@ function logActivation($system_id, $activation_key, $duration, $ip) {
     }
     
     file_put_contents($activation_logs, json_encode($logs));
+    return true;
 }
 
 // Validate activation key
@@ -155,15 +191,18 @@ function validateActivationKey($system_id, $activation_key, $secret_key) {
         $duration = isset($duration_map[$duration_code]) ? $duration_map[$duration_code] : '2days';
         
         // Mark key as used and log activation
-        markKeyAsUsed($activation_key);
-        logActivation($system_id, $activation_key, $duration, $_SERVER['REMOTE_ADDR']);
-        
-        return array(
-            'valid' => true,
-            'duration' => $duration,
-            'system_id' => $system_id,
-            'message' => 'Activation successful'
-        );
+        if (markKeyAsUsed($activation_key)) {
+            logActivation($system_id, $activation_key, $duration, $_SERVER['REMOTE_ADDR']);
+            
+            return array(
+                'valid' => true,
+                'duration' => $duration,
+                'system_id' => $system_id,
+                'message' => 'Activation successful'
+            );
+        } else {
+            return array('valid' => false, 'error' => 'Failed to mark key as used');
+        }
     }
     
     return array('valid' => false, 'error' => 'Invalid activation key');
@@ -196,11 +235,12 @@ function generateActivationKey($system_id, $duration, $secret_key) {
         'raw_key' => $key,
         'formatted_key' => $formatted_key,
         'duration' => $duration,
-        'system_id' => $system_id
+        'system_id' => $system_id,
+        'generated_at' => date('Y-m-d H:i:s')
     );
 }
 
-// Main request handling for POST requests
+// Main request handling
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $input = json_decode(file_get_contents('php://input'), true);
     
@@ -242,11 +282,38 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
 } elseif ($_SERVER['REQUEST_METHOD'] == 'GET' && !isset($_GET['callback'])) {
     // Simple status check for regular GET
+    $used_keys_count = count(loadUsedKeys());
+    $logs_count = 0;
+    
+    if (file_exists($activation_logs)) {
+        $logs_data = file_get_contents($activation_logs);
+        if ($logs_data !== false) {
+            $logs = json_decode($logs_data, true);
+            $logs_count = is_array($logs) ? count($logs) : 0;
+        }
+    }
+    
     echo json_encode(array(
         'status' => 'active', 
         'service' => 'Activation Key Server', 
         'version' => '2.0',
-        'used_keys_count' => count(loadUsedKeys()),
+        'used_keys_count' => $used_keys_count,
+        'activation_logs_count' => $logs_count,
+        'timestamp' => date('Y-m-d H:i:s'),
+        'server' => $_SERVER['HTTP_HOST'] ?? 'Unknown'
+    ));
+}
+
+// Handle direct access - show info
+if ($_SERVER['REQUEST_METHOD'] == 'GET' && empty($_GET)) {
+    echo json_encode(array(
+        'message' => 'Activation Key Server is running',
+        'endpoints' => array(
+            'GET ?callback=xxx' => 'JSONP status check',
+            'GET ?callback=xxx&action=generate&system_id=XXX&duration=XXX&vendor_password=XXX' => 'Generate key via JSONP',
+            'POST with JSON body' => 'Generate/validate keys via POST',
+            'GET (no params)' => 'Server status'
+        ),
         'timestamp' => date('Y-m-d H:i:s')
     ));
 }
