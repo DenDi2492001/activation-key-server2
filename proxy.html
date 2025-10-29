@@ -84,6 +84,8 @@
         const systemId = urlParams.get('systemId') || '';
         const duration = urlParams.get('duration') || '2days';
 
+        console.log('URL Parameters:', { action, systemId, duration });
+
         // Update status
         function updateStatus(message, isError = false, isSuccess = false, isWarning = false) {
             const statusElement = document.getElementById('status');
@@ -101,11 +103,51 @@
             console.log('Proxy:', message);
         }
 
-        // CORS-compatible request using fetch with no-cors mode
+        // CORS Proxy function
+        async function makeCORSRequest(url, options) {
+            // Try multiple CORS proxies
+            const corsProxies = [
+                'https://cors-anywhere.herokuapp.com/',
+                'https://api.codetabs.com/v1/proxy?quest=',
+                'https://corsproxy.io/?',
+                'https://proxy.cors.sh/'
+            ];
+
+            for (const proxy of corsProxies) {
+                try {
+                    updateStatus(`Trying proxy: ${proxy}...`);
+                    const proxyUrl = proxy + encodeURIComponent(url);
+                    
+                    const response = await fetch(proxyUrl, {
+                        ...options,
+                        headers: {
+                            ...options.headers,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+
+                    if (response.ok) {
+                        updateStatus(`Proxy ${proxy} worked!`);
+                        return response;
+                    }
+                } catch (error) {
+                    console.log(`Proxy ${proxy} failed:`, error.message);
+                    continue;
+                }
+            }
+            
+            throw new Error('All CORS proxies failed');
+        }
+
+        // Main connection function
         async function connectToServer() {
             try {
                 updateStatus('Preparing request...');
                 
+                if (!systemId && action === 'generate') {
+                    throw new Error('System ID is required for key generation');
+                }
+
                 const payload = {
                     action: action,
                     system_id: systemId,
@@ -113,26 +155,43 @@
                     vendor_password: 'VENDOR123'
                 };
 
-                updateStatus('Sending request to server...');
+                updateStatus('Sending request via CORS proxy...');
                 
-                // Use a CORS proxy or direct request
                 const serverUrl = 'http://myactivation.infinityfreeapp.com/validate.php';
                 
-                // Try direct fetch first
-                const response = await fetch(serverUrl, {
+                // Try direct fetch first (might work in some browsers)
+                try {
+                    updateStatus('Trying direct connection...');
+                    const directResponse = await fetch(serverUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (directResponse.ok) {
+                        const result = await directResponse.json();
+                        updateStatus('Direct connection successful!', false, true);
+                        sendSuccess(result);
+                        return;
+                    }
+                } catch (directError) {
+                    console.log('Direct connection failed, trying CORS proxy...');
+                }
+
+                // If direct failed, try CORS proxy
+                updateStatus('Direct connection failed, trying CORS proxies...');
+                
+                const response = await makeCORSRequest(serverUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(payload),
-                    mode: 'cors'
+                    body: JSON.stringify(payload)
                 });
 
                 updateStatus('Processing server response...');
-
-                if (!response.ok) {
-                    throw new Error(`Server returned HTTP ${response.status}: ${response.statusText}`);
-                }
 
                 const textResponse = await response.text();
                 console.log('Raw response:', textResponse);
@@ -144,89 +203,94 @@
                     throw new Error(`Invalid JSON response: ${textResponse}`);
                 }
                 
-                // Check if this is a status response or actual key generation
-                if (data.status && data.service) {
-                    // This is a status response, not a key generation response
-                    updateStatus('Server responded but returned status instead of key data', true);
-                    throw new Error('Server returned status page instead of key generation data');
-                }
-                
-                updateStatus('Request completed successfully!', false, true);
-
-                // Send result back to opener
-                if (window.opener && !window.opener.closed) {
-                    window.opener.postMessage({
-                        type: 'PROXY_RESULT',
-                        data: data,
-                        timestamp: new Date().toISOString()
-                    }, '*');
-                    console.log('Sent result to opener:', data);
-                }
-
-                // Close after short delay
-                setTimeout(() => {
-                    updateStatus('Closing connection...');
-                    window.close();
-                }, 1000);
-
-            } catch (error) {
-                console.error('Proxy Error:', error);
-                updateStatus(`Server Error: ${error.message}`, true);
-                
-                // If online generation fails, try local generation for 'generate' action only
-                if (action === 'generate') {
-                    updateStatus('Server connection failed. Trying local key generation...', false, false, true);
-                    
-                    try {
-                        // Wait a moment to show the warning
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-                        
-                        const localKey = generateLocalKey(systemId, duration);
-                        const localData = {
-                            success: true,
-                            data: localKey
-                        };
-                        
-                        updateStatus('Local key generation successful!', false, true);
-                        
-                        if (window.opener && !window.opener.closed) {
-                            window.opener.postMessage({
-                                type: 'PROXY_RESULT',
-                                data: localData,
-                                timestamp: new Date().toISOString()
-                            }, '*');
-                            console.log('Sent local key to opener:', localData);
-                        }
-                        
-                        // Close after short delay
-                        setTimeout(() => {
-                            window.close();
-                        }, 1000);
+                // Handle different response types
+                if (data.status === 'active') {
+                    // Server is active but returned status instead of key data
+                    // This means we need to handle key generation differently
+                    if (action === 'generate') {
+                        updateStatus('Server active, but key generation endpoint may be different', false, false, true);
+                        // Try alternative approach or use local generation
+                        await handleKeyGeneration();
                         return;
-                        
-                    } catch (localError) {
-                        console.error('Local generation failed:', localError);
-                        updateStatus(`Local generation failed: ${localError.message}`, true);
                     }
                 }
                 
-                // Send error back to opener
-                if (window.opener && !window.opener.closed) {
-                    window.opener.postMessage({
-                        type: 'PROXY_ERROR',
-                        error: error.message,
-                        timestamp: new Date().toISOString()
-                    }, '*');
-                }
+                sendSuccess(data);
 
-                // Close after error display
-                setTimeout(() => {
-                    window.close();
-                }, 5000);
+            } catch (error) {
+                console.error('Connection Error:', error);
+                updateStatus(`Connection failed: ${error.message}`, true);
+                
+                // If all else fails and it's a generate action, use local generation
+                if (action === 'generate' && systemId) {
+                    await handleLocalGeneration();
+                    return;
+                }
+                
+                sendError(error.message);
             }
         }
 
-        // Enhanced local key generation with better security
+        // Handle key generation specifically
+        async function handleKeyGeneration() {
+            try {
+                updateStatus('Attempting key generation...', false, false, true);
+                
+                // Try alternative endpoint or method
+                const generateUrl = 'http://myactivation.infinityfreeapp.com/validate.php?action=generate';
+                const payload = {
+                    system_id: systemId,
+                    duration: duration,
+                    vendor_password: 'VENDOR123'
+                };
+
+                const response = await makeCORSRequest(generateUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    sendSuccess(result);
+                } else {
+                    throw new Error(result.error || 'Key generation failed');
+                }
+
+            } catch (generateError) {
+                console.error('Key generation failed:', generateError);
+                updateStatus('Key generation failed, using local generation...', false, false, true);
+                await handleLocalGeneration();
+            }
+        }
+
+        // Local key generation fallback
+        async function handleLocalGeneration() {
+            try {
+                updateStatus('Starting local key generation...', false, false, true);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                const localKey = generateLocalKey(systemId, duration);
+                const localData = {
+                    success: true,
+                    data: localKey
+                };
+                
+                updateStatus('Local key generation successful!', false, true);
+                sendSuccess(localData);
+                
+            } catch (localError) {
+                console.error('Local generation failed:', localError);
+                updateStatus(`Local generation failed: ${localError.message}`, true);
+                sendError('Local key generation failed');
+            }
+        }
+
+        // Enhanced local key generation
         function generateLocalKey(systemId, duration) {
             const durationMap = {
                 '2days': 'T',
@@ -237,29 +301,20 @@
             };
             
             const durationCode = durationMap[duration] || 'T';
-            
-            // More secure hash with multiple components
             const timestamp = Date.now().toString();
-            const randomComponent = Math.random().toString(36).substring(2, 10);
-            const baseString = systemId + 'DENDI_SECURE_V2' + durationCode + timestamp + randomComponent;
+            const random = Math.random().toString(36).substring(2, 15);
             
-            // Create SHA-256 like hash (simplified for browser)
             let hash = '';
+            const baseString = systemId + 'DENDI_SECURE' + durationCode + timestamp + random;
+            
             for (let i = 0; i < baseString.length; i++) {
-                const charCode = baseString.charCodeAt(i);
-                // Mix the characters more thoroughly
-                hash += ((charCode * (i + 1)) % 36).toString(36);
+                const code = baseString.charCodeAt(i);
+                hash += ((code * (i + 1)) % 36).toString(36);
             }
             
-            // Take first 15 characters and convert to uppercase
-            hash = hash.substring(0, 15).toUpperCase();
-            
-            // Ensure it's alphanumeric
-            hash = hash.replace(/[^A-Z0-9]/g, '0');
-            
+            hash = hash.substring(0, 15).toUpperCase().replace(/[^A-Z0-9]/g, '0');
             const rawKey = durationCode + hash;
             
-            // Format with dashes
             const formattedKey = 
                 rawKey.substring(0, 4) + '-' +
                 rawKey.substring(4, 8) + '-' +
@@ -271,93 +326,56 @@
                 formatted_key: formattedKey,
                 duration: duration,
                 system_id: systemId,
-                local_generated: true, // Mark as locally generated
-                timestamp: new Date().toISOString(),
-                security_level: 'local_fallback'
+                local_generated: true,
+                timestamp: new Date().toISOString()
             };
         }
 
-        // Validate key format locally
-        function validateKeyFormat(key) {
-            const cleanKey = key.replace('-', '').toUpperCase();
-            
-            if (cleanKey.length !== 16) {
-                return false;
-            }
-            
-            if (!/^[A-Z0-9]+$/.test(cleanKey)) {
-                return false;
-            }
-            
-            // Check duration code
-            const durationCode = cleanKey.charAt(0);
-            const validDurationCodes = ['T', 'M', 'Q', 'H', 'Y'];
-            
-            return validDurationCodes.includes(durationCode);
-        }
-
-        // Start connection when page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            updateStatus('Starting server connection...');
-            
-            // Validate parameters
-            if (!systemId && action === 'generate') {
-                updateStatus('Error: System ID is required for key generation', true);
-                
-                if (window.opener && !window.opener.closed) {
-                    window.opener.postMessage({
-                        type: 'PROXY_ERROR',
-                        error: 'System ID is required',
-                        timestamp: new Date().toISOString()
-                    }, '*');
-                }
-                
-                setTimeout(() => {
-                    window.close();
-                }, 3000);
-                return;
-            }
-            
-            // Add a small delay to ensure window is fully loaded
-            setTimeout(() => {
-                connectToServer();
-            }, 500);
-        });
-
-        // Close if no activity after 30 seconds
-        setTimeout(() => {
-            if (!window.closed) {
-                updateStatus('Connection timeout - closing window', true);
-                
-                if (window.opener && !window.opener.closed) {
-                    window.opener.postMessage({
-                        type: 'PROXY_ERROR',
-                        error: 'Connection timeout',
-                        timestamp: new Date().toISOString()
-                    }, '*');
-                }
-                
-                window.close();
-            }
-        }, 30000);
-
-        // Handle beforeunload to clean up
-        window.addEventListener('beforeunload', function() {
-            console.log('Proxy window closing...');
+        // Send success result to opener
+        function sendSuccess(data) {
             if (window.opener && !window.opener.closed) {
                 window.opener.postMessage({
-                    type: 'PROXY_WINDOW_CLOSED',
+                    type: 'PROXY_RESULT',
+                    data: data,
+                    timestamp: new Date().toISOString()
+                }, '*');
+                console.log('Sent success to opener:', data);
+                
+                setTimeout(() => {
+                    updateStatus('Closing connection...');
+                    window.close();
+                }, 1000);
+            } else {
+                updateStatus('Opener window not available', true);
+                setTimeout(() => window.close(), 3000);
+            }
+        }
+
+        // Send error to opener
+        function sendError(error) {
+            if (window.opener && !window.opener.closed) {
+                window.opener.postMessage({
+                    type: 'PROXY_ERROR',
+                    error: error,
                     timestamp: new Date().toISOString()
                 }, '*');
             }
+            setTimeout(() => window.close(), 5000);
+        }
+
+        // Start connection
+        document.addEventListener('DOMContentLoaded', function() {
+            updateStatus('Starting connection sequence...');
+            setTimeout(connectToServer, 500);
         });
 
-        // Handle page visibility changes
-        document.addEventListener('visibilitychange', function() {
-            if (document.hidden) {
-                console.log('Proxy window hidden');
+        // Timeout handling
+        setTimeout(() => {
+            if (!window.closed) {
+                updateStatus('Connection timeout', true);
+                sendError('Connection timeout after 30 seconds');
             }
-        });
+        }, 30000);
     </script>
 </body>
 </html>
