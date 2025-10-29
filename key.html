@@ -152,6 +152,17 @@
             text-align: center;
             font-size: 14px;
         }
+
+        .local-key-warning {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+            text-align: center;
+            font-size: 14px;
+            color: #856404;
+        }
     </style>
 </head>
 <body>
@@ -176,6 +187,12 @@
                 <div class="popup-notice">
                     📢 <strong>Note:</strong> Key generation will open a popup window for server connection.
                     Please allow popups for this website.
+                </div>
+
+                <!-- Local Key Warning -->
+                <div id="localKeyWarning" class="local-key-warning" style="display: none;">
+                    ⚠️ <strong>Local Key Generation Active</strong> - Server connection failed. 
+                    Locally generated keys have limited security and should be used temporarily only.
                 </div>
                 
                 <!-- System ID Input -->
@@ -239,6 +256,14 @@
                     <button class="btn btn-new" onclick="generateNewKey()">နောက်ထပ်ထုတ်ရန်</button>
                     <button class="btn btn-close" onclick="closeGenerator()">ပိတ်ရန်</button>
                 </div>
+
+                <!-- Used Keys List -->
+                <div class="section">
+                    <h3>Recently Generated Keys</h3>
+                    <div id="usedKeysList" class="used-keys">
+                        <!-- Used keys will be displayed here -->
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -249,6 +274,43 @@
         let currentKey = "";
         let usedKeys = JSON.parse(localStorage.getItem('usedKeys')) || [];
         let currentProxyWindow = null;
+        let messageHandler = null;
+        
+        // Initialize local key tracking
+        const LOCAL_KEYS_STORAGE = 'localGeneratedKeys';
+        
+        function initializeLocalKeys() {
+            if (!localStorage.getItem(LOCAL_KEYS_STORAGE)) {
+                localStorage.setItem(LOCAL_KEYS_STORAGE, JSON.stringify([]));
+            }
+        }
+        
+        function getLocalGeneratedKeys() {
+            return JSON.parse(localStorage.getItem(LOCAL_KEYS_STORAGE)) || [];
+        }
+        
+        function saveLocalGeneratedKey(keyData) {
+            const localKeys = getLocalGeneratedKeys();
+            localKeys.unshift({
+                key: keyData.raw_key,
+                systemId: keyData.system_id,
+                duration: keyData.duration,
+                timestamp: new Date().toISOString(),
+                expiry: calculateExpiryDate(keyData.duration)
+            });
+            
+            // Keep only last 50 local keys
+            if (localKeys.length > 50) {
+                localKeys.splice(50);
+            }
+            
+            localStorage.setItem(LOCAL_KEYS_STORAGE, JSON.stringify(localKeys));
+        }
+        
+        function isKeyLocallyUsed(key) {
+            const localKeys = getLocalGeneratedKeys();
+            return localKeys.some(k => k.key === key);
+        }
         
         function checkSecurity() {
             const password = document.getElementById('password').value.trim();
@@ -257,6 +319,8 @@
                 document.getElementById('securitySection').style.display = 'none';
                 document.getElementById('mainContent').style.display = 'block';
                 updateExpiryInfo();
+                initializeLocalKeys();
+                displayUsedKeys();
             } else {
                 alert('❌ Password မှားနေပါတယ်');
             }
@@ -309,6 +373,8 @@
         
         function generateKey() {
             const systemId = document.getElementById('systemId').value.trim();
+            const duration = document.querySelector('input[name="duration"]:checked').value;
+            
             if (!systemId) {
                 alert('Please enter customer System ID');
                 return;
@@ -316,10 +382,13 @@
             
             // Show loading
             document.getElementById('loading').style.display = 'block';
+            document.getElementById('localKeyWarning').style.display = 'none';
             
             try {
-                // Open proxy window
+                // Open proxy window with ALL parameters
                 const proxyUrl = `${PROXY_URL}?action=generate&systemId=${encodeURIComponent(systemId)}&duration=${encodeURIComponent(duration)}`;
+                console.log('Opening proxy URL:', proxyUrl);
+                
                 currentProxyWindow = window.open(proxyUrl, 'proxy', 'width=600,height=400,left=100,top=100');
                 
                 if (!currentProxyWindow) {
@@ -327,7 +396,9 @@
                 }
                 
                 // Listen for result from proxy
-                const messageHandler = function(event) {
+                messageHandler = function(event) {
+                    console.log('Received message:', event.data);
+                    
                     if (event.data.type === 'PROXY_RESULT') {
                         const result = event.data.data;
                         
@@ -342,8 +413,15 @@
                                 systemId: systemId,
                                 duration: duration,
                                 timestamp: new Date().toLocaleString(),
-                                expiry: calculateExpiryDate(duration)
+                                expiry: calculateExpiryDate(duration),
+                                local_generated: keyData.local_generated || false
                             });
+                            
+                            // If locally generated, track it
+                            if (keyData.local_generated) {
+                                saveLocalGeneratedKey(keyData);
+                                document.getElementById('localKeyWarning').style.display = 'block';
+                            }
                             
                             // Keep only last 20 keys
                             if (usedKeys.length > 20) {
@@ -355,7 +433,14 @@
                             const displayText = `System ID: ${systemId}\nလိုင်စင်အမျိုးအစား: ${getDurationDisplay(duration)}\nActivation Key: ${keyData.formatted_key}\nRaw Key: ${keyData.raw_key}\nGenerated: ${new Date().toLocaleString()}`;
                             document.getElementById('keyDisplay').textContent = displayText;
                             
-                            alert('✅ Key generated successfully!');
+                            if (keyData.local_generated) {
+                                alert('⚠️ Using locally generated key (server connection failed)\n\nThis key will be tracked locally to prevent reuse.');
+                            } else {
+                                alert('✅ Key generated successfully!');
+                            }
+                            
+                            displayUsedKeys();
+                            
                         } else {
                             alert('❌ Key generation failed: ' + (result.error || 'Unknown error'));
                         }
@@ -364,6 +449,9 @@
                         
                     } else if (event.data.type === 'PROXY_ERROR') {
                         alert('❌ Server connection error: ' + event.data.error);
+                        cleanup();
+                    } else if (event.data.type === 'PROXY_WINDOW_CLOSED') {
+                        console.log('Proxy window was closed by user');
                         cleanup();
                     }
                 };
@@ -383,12 +471,40 @@
             
             function cleanup() {
                 document.getElementById('loading').style.display = 'none';
-                window.removeEventListener('message', messageHandler);
+                if (messageHandler) {
+                    window.removeEventListener('message', messageHandler);
+                }
                 if (currentProxyWindow && !currentProxyWindow.closed) {
                     currentProxyWindow.close();
                 }
                 currentProxyWindow = null;
+                messageHandler = null;
             }
+        }
+        
+        function displayUsedKeys() {
+            const usedKeysList = document.getElementById('usedKeysList');
+            const allKeys = [...usedKeys];
+            
+            if (allKeys.length === 0) {
+                usedKeysList.innerHTML = '<p>No keys generated yet</p>';
+                return;
+            }
+            
+            let html = '<div style="font-size: 12px; line-height: 1.4;">';
+            allKeys.slice(0, 10).forEach(key => {
+                const localIndicator = key.local_generated ? '🔸 ' : '🔹 ';
+                html += `
+                    <div style="margin-bottom: 8px; padding: 5px; background: #f8f9fa; border-radius: 3px;">
+                        ${localIndicator}<strong>${key.systemId}</strong><br>
+                        Key: ${key.formatted_key}<br>
+                        Duration: ${getDurationDisplay(key.duration)} | ${key.timestamp}
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            usedKeysList.innerHTML = html;
         }
         
         function copyToClipboard() {
@@ -406,6 +522,7 @@
         function generateNewKey() {
             document.getElementById('systemId').value = '';
             document.getElementById('keyDisplay').textContent = 'Key မထုတ်ရသေးပါ';
+            document.getElementById('localKeyWarning').style.display = 'none';
             currentKey = '';
         }
         
@@ -431,6 +548,7 @@
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             updateExpiryInfo();
+            initializeLocalKeys();
         });
     </script>
 </body>
