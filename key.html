@@ -241,16 +241,21 @@
         }
         
         function checkSecurity() {
-            const password = document.getElementById('password').value;
-            if (password === VENDOR_PASSWORD) {
-                document.getElementById('securitySection').style.display = 'none';
-                document.getElementById('mainContent').style.display = 'block';
-                updateExpiryInfo();
-                updateUsedKeysList();
-            } else {
-                alert('❌ Password မှားနေပါတယ်');
-            }
-        }
+    const password = document.getElementById('password').value;
+    
+    // Strict password check
+    if (password.trim() === "VENDOR123") {
+        document.getElementById('securitySection').style.display = 'none';
+        document.getElementById('mainContent').style.display = 'block';
+        updateExpiryInfo();
+        updateUsedKeysList();
+    } else {
+        alert('❌ Password မှားနေပါတယ်');
+        document.getElementById('password').value = '';
+        document.getElementById('password').focus();
+        return false;
+    }
+}
         
         function updateExpiryInfo() {
             const duration = document.querySelector('input[name="duration"]:checked').value;
@@ -414,5 +419,6 @@
 </body>
 
 </html>
+
 
 
