@@ -142,14 +142,24 @@
         .main-content {
             display: none;
         }
+        
+        .popup-notice {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+            text-align: center;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>Activation Key Generator - Vendor Portal</h1>
-            <div id="serverStatus" class="server-status server-offline">
-                🔴 Checking server status...
+            <div id="serverStatus" class="server-status server-online">
+                🟢 Server Ready (Proxy Method)
             </div>
         </div>
         
@@ -163,6 +173,11 @@
             
             <!-- Main Content (Hidden until security check) -->
             <div id="mainContent" class="section main-content">
+                <div class="popup-notice">
+                    📢 <strong>Note:</strong> Key generation will open a popup window for server connection.
+                    Please allow popups for this website.
+                </div>
+                
                 <!-- System ID Input -->
                 <div class="section">
                     <h3>Customer System ID</h3>
@@ -202,7 +217,7 @@
                 
                 <!-- Loading Indicator -->
                 <div id="loading" class="loading">
-                    <p>🔄 Server နှင့် ချိတ်ဆက်နေသည်...</p>
+                    <p>🔄 Connecting to server via proxy...</p>
                 </div>
                 
                 <!-- Generate Button -->
@@ -230,32 +245,18 @@
 
     <script>
         const VENDOR_PASSWORD = "VENDOR123";
-        const SERVER_URL = http://myactivation.infinityfreeapp.com/validate.php
+        const PROXY_URL = "https://dendi2492001.github.io/activation-key-server2/proxy.html";
         let currentKey = "";
         let usedKeys = JSON.parse(localStorage.getItem('usedKeys')) || [];
-        
-        // Check server status on load
-        checkServerStatus();
-        
-        async function checkServerStatus() {
-            try {
-                const response = await fetch(SERVER_URL);
-                const data = await response.json();
-                document.getElementById('serverStatus').className = 'server-status server-online';
-                document.getElementById('serverStatus').innerHTML = '🟢 Server Online';
-            } catch (error) {
-                document.getElementById('serverStatus').className = 'server-status server-offline';
-                document.getElementById('serverStatus').innerHTML = '🔴 Server Offline - Check Connection';
-            }
-        }
+        let currentProxyWindow = null;
         
         function checkSecurity() {
-            const password = document.getElementById('password').value;
+            const password = document.getElementById('password').value.trim();
+            
             if (password === VENDOR_PASSWORD) {
                 document.getElementById('securitySection').style.display = 'none';
                 document.getElementById('mainContent').style.display = 'block';
                 updateExpiryInfo();
-                updateUsedKeysList();
             } else {
                 alert('❌ Password မှားနေပါတယ်');
             }
@@ -279,16 +280,16 @@
                     expiryDate.setDate(now.getDate() + 2);
                     break;
                 case '1month':
-                    expiryDate.setDate(now.getDate() + 30);
+                    expiryDate.setMonth(now.getMonth() + 1);
                     break;
                 case '3months':
-                    expiryDate.setDate(now.getDate() + 90);
+                    expiryDate.setMonth(now.getMonth() + 3);
                     break;
                 case '6months':
-                    expiryDate.setDate(now.getDate() + 180);
+                    expiryDate.setMonth(now.getMonth() + 6);
                     break;
                 case '12months':
-                    expiryDate.setDate(now.getDate() + 365);
+                    expiryDate.setFullYear(now.getFullYear() + 1);
                     break;
             }
             
@@ -306,85 +307,99 @@
             return durationMap[duration] || duration;
         }
         
-        async function generateKey() {
+        function generateKey() {
             const systemId = document.getElementById('systemId').value.trim();
             if (!systemId) {
                 alert('Please enter customer System ID');
                 return;
             }
             
-            const duration = document.querySelector('input[name="duration"]:checked').value;
-            
             // Show loading
             document.getElementById('loading').style.display = 'block';
             
             try {
-                const response = await fetch(SERVER_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        action: 'generate',
-                        system_id: systemId,
-                        duration: duration,
-                        vendor_password: VENDOR_PASSWORD
-                    })
-                });
+                // Open proxy window
+                const proxyUrl = `${PROXY_URL}?action=generate&systemId=${encodeURIComponent(systemId)}&duration=${encodeURIComponent(duration)}`;
+                currentProxyWindow = window.open(proxyUrl, 'proxy', 'width=600,height=400,left=100,top=100');
                 
-                const result = await response.json();
-                
-                if (result.success) {
-                    const keyData = result.data;
-                    currentKey = keyData.raw_key;
-                    
-                    // Save to used keys
-                    usedKeys.unshift({
-                        key: keyData.raw_key,
-                        formatted_key: keyData.formatted_key,
-                        systemId: systemId,
-                        duration: duration,
-                        timestamp: new Date().toLocaleString(),
-                        expiry: calculateExpiryDate(duration)
-                    });
-                    
-                    // Keep only last 20 keys
-                    if (usedKeys.length > 20) {
-                        usedKeys = usedKeys.slice(0, 20);
-                    }
-                    
-                    localStorage.setItem('usedKeys', JSON.stringify(usedKeys));
-                    displayKey(keyData, duration, systemId);
-                    updateUsedKeysList();
-                } else {
-                    alert('❌ Key generation failed: ' + result.error);
+                if (!currentProxyWindow) {
+                    throw new Error('Please allow popups for this website to generate keys');
                 }
                 
+                // Listen for result from proxy
+                const messageHandler = function(event) {
+                    if (event.data.type === 'PROXY_RESULT') {
+                        const result = event.data.data;
+                        
+                        if (result.success) {
+                            const keyData = result.data;
+                            currentKey = keyData.raw_key;
+                            
+                            // Save to used keys
+                            usedKeys.unshift({
+                                key: keyData.raw_key,
+                                formatted_key: keyData.formatted_key,
+                                systemId: systemId,
+                                duration: duration,
+                                timestamp: new Date().toLocaleString(),
+                                expiry: calculateExpiryDate(duration)
+                            });
+                            
+                            // Keep only last 20 keys
+                            if (usedKeys.length > 20) {
+                                usedKeys = usedKeys.slice(0, 20);
+                            }
+                            
+                            localStorage.setItem('usedKeys', JSON.stringify(usedKeys));
+                            
+                            const displayText = `System ID: ${systemId}\nလိုင်စင်အမျိုးအစား: ${getDurationDisplay(duration)}\nActivation Key: ${keyData.formatted_key}\nRaw Key: ${keyData.raw_key}\nGenerated: ${new Date().toLocaleString()}`;
+                            document.getElementById('keyDisplay').textContent = displayText;
+                            
+                            alert('✅ Key generated successfully!');
+                        } else {
+                            alert('❌ Key generation failed: ' + (result.error || 'Unknown error'));
+                        }
+                        
+                        cleanup();
+                        
+                    } else if (event.data.type === 'PROXY_ERROR') {
+                        alert('❌ Server connection error: ' + event.data.error);
+                        cleanup();
+                    }
+                };
+                
+                window.addEventListener('message', messageHandler);
+                
+                // Timeout after 30 seconds
+                setTimeout(() => {
+                    cleanup();
+                    alert('❌ Connection timeout. Please try again.');
+                }, 30000);
+                
             } catch (error) {
-                alert('❌ Server connection error: ' + error.message);
-            } finally {
-                document.getElementById('loading').style.display = 'none';
+                cleanup();
+                alert('❌ Error: ' + error.message);
             }
-        }
-        
-        function displayKey(keyData, duration, systemId) {
-            const durationText = getDurationDisplay(duration);
             
-            const displayText = `System ID: ${systemId}\nလိုင်စင်အမျိုးအစား: ${durationText}\nActivation Key: ${keyData.formatted_key}\nRaw Key: ${keyData.raw_key}`;
-            document.getElementById('keyDisplay').textContent = displayText;
-        }
-        
-        function updateUsedKeysList() {
-            // Optional: Can display recent keys here
+            function cleanup() {
+                document.getElementById('loading').style.display = 'none';
+                window.removeEventListener('message', messageHandler);
+                if (currentProxyWindow && !currentProxyWindow.closed) {
+                    currentProxyWindow.close();
+                }
+                currentProxyWindow = null;
+            }
         }
         
         function copyToClipboard() {
             if (currentKey) {
                 navigator.clipboard.writeText(currentKey).then(() => {
-                    alert('✅ Activation Key ကို clipboard သို့ကူးပြီးပါပြီ');
+                    alert('✅ Activation Key copied to clipboard!');
+                }).catch(err => {
+                    alert('❌ Failed to copy to clipboard');
                 });
             } else {
-                alert('⚠️ Key မထုတ်ရသေးပါ');
+                alert('⚠️ No key generated yet');
             }
         }
         
@@ -407,11 +422,16 @@
             }
         });
         
+        document.getElementById('systemId').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                generateKey();
+            }
+        });
+        
         // Initialize
-        updateUsedKeysList();
+        document.addEventListener('DOMContentLoaded', function() {
+            updateExpiryInfo();
+        });
     </script>
 </body>
 </html>
-
-
-
