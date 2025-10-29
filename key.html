@@ -5,27 +5,61 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🔑 Activation Key Generator (Vendor Only)</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f0f2f5;
-            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             padding: 20px;
         }
         
         .container {
-            max-width: 600px;
-            margin: 0 auto;
             background: white;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
             overflow: hidden;
+            width: 100%;
+            max-width: 500px;
         }
         
         .header {
-            background: #6f42c1;
+            background: linear-gradient(135deg, #6f42c1 0%, #5a2d9c 100%);
             color: white;
-            padding: 20px;
+            padding: 25px;
             text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        
+        .server-status {
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-block;
+            margin-top: 5px;
+        }
+        
+        .server-online {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        
+        .server-offline {
+            background: rgba(220,53,69,0.8);
+            border: 1px solid rgba(220,53,69,0.9);
         }
         
         .content {
@@ -33,45 +67,121 @@
         }
         
         .section {
-            margin-bottom: 20px;
+            margin-bottom: 25px;
+        }
+        
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+        
+        input[type="text"]:focus, input[type="password"]:focus {
+            outline: none;
+            border-color: #6f42c1;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(111, 66, 193, 0.1);
+        }
+        
+        .license-options {
+            display: grid;
+            gap: 10px;
         }
         
         .license-option {
-            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+        
+        .license-option:hover {
+            border-color: #6f42c1;
+            background: white;
+        }
+        
+        .license-option.selected {
+            border-color: #6f42c1;
+            background: #f0e6ff;
+        }
+        
+        .license-option input {
+            margin-right: 10px;
         }
         
         .info-box {
-            background: #e3f2fd;
+            background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
             border: 1px solid #1565c0;
-            border-radius: 5px;
+            border-radius: 8px;
             padding: 15px;
             margin: 15px 0;
+            font-size: 14px;
+            line-height: 1.5;
         }
         
         .key-display {
-            background: #2b2b2b;
-            color: #00ff00;
-            font-family: 'Consolas', monospace;
-            padding: 15px;
-            border-radius: 5px;
+            background: #1a1a1a;
+            color: #00ff9d;
+            font-family: 'Consolas', 'Monaco', monospace;
+            padding: 20px;
+            border-radius: 8px;
             margin: 15px 0;
             white-space: pre-wrap;
             word-wrap: break-word;
-            min-height: 100px;
+            min-height: 120px;
+            border: 1px solid #333;
+            font-size: 14px;
+            line-height: 1.4;
         }
         
         .btn {
-            padding: 10px 20px;
+            padding: 12px 24px;
             border: none;
-            border-radius: 5px;
+            border-radius: 8px;
             cursor: pointer;
-            font-weight: bold;
-            margin: 5px;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
         }
         
         .btn-generate {
-            background: #28a745;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
             color: white;
+            width: 100%;
+            padding: 15px;
+            font-size: 16px;
+        }
+        
+        .btn-generate:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3);
         }
         
         .btn-copy {
@@ -90,54 +200,31 @@
         }
         
         .action-buttons {
-            display: flex;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-        
-        .used-keys {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
             margin-top: 20px;
-            max-height: 200px;
-            overflow-y: auto;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            padding: 10px;
-            background: #f8f9fa;
         }
         
         .loading {
             display: none;
             text-align: center;
-            padding: 10px;
+            padding: 20px;
         }
         
-        .server-status {
-            padding: 8px;
-            border-radius: 4px;
-            margin-bottom: 10px;
-            text-align: center;
-            font-weight: bold;
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #6f42c1;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
         }
         
-        .server-online {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        
-        .server-offline {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        
-        input[type="text"], input[type="password"] {
-            width: 100%;
-            padding: 10px;
-            margin: 10px 0;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 16px;
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
         
         .security-section {
@@ -148,83 +235,60 @@
             display: none;
         }
         
-        .popup-notice {
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            border-radius: 5px;
-            padding: 10px;
+        .alert {
+            padding: 12px 15px;
+            border-radius: 8px;
             margin: 10px 0;
-            text-align: center;
             font-size: 14px;
+            text-align: center;
         }
-
-        .local-key-warning {
+        
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .alert-warning {
             background: #fff3cd;
-            border: 1px solid #ffc107;
-            border-radius: 5px;
-            padding: 10px;
-            margin: 10px 0;
-            text-align: center;
-            font-size: 14px;
             color: #856404;
+            border: 1px solid #ffeaa7;
         }
-
-        .used-key-item {
-            padding: 8px;
-            margin: 5px 0;
-            border-radius: 4px;
-            border-left: 4px solid #007acc;
-            background: white;
+        
+        .alert-danger {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
         }
-
-        .used-key-item.local {
-            border-left-color: #dc3545;
-            background: #f8f9fa;
-        }
-
-        .key-info {
-            font-size: 12px;
-            color: #666;
-        }
-
-        .key-value {
-            font-family: 'Consolas', monospace;
-            font-weight: bold;
-            color: #333;
-        }
-
-        .test-buttons {
-            margin: 10px 0;
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 5px;
-        }
-
-        .connection-method {
+        
+        .connection-info {
             background: #e8f5e8;
             border: 1px solid #28a745;
-            border-radius: 5px;
-            padding: 10px;
+            border-radius: 8px;
+            padding: 10px 15px;
             margin: 10px 0;
             font-size: 12px;
-        }
-
-        .success-message {
-            background: #d4edda;
-            border: 1px solid #c3e6cb;
-            border-radius: 5px;
-            padding: 10px;
-            margin: 10px 0;
-            color: #155724;
             text-align: center;
+        }
+        
+        .test-buttons {
+            text-align: center;
+            margin: 15px 0;
+        }
+        
+        .btn-test {
+            background: #6f42c1;
+            color: white;
+            padding: 8px 15px;
+            font-size: 12px;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>Activation Key Generator - Vendor Portal</h1>
-            <div id="serverStatus" class="server-status server-online">
+            <h1>🔑 Activation Key Generator</h1>
+            <div class="server-status server-online" id="serverStatus">
                 🟢 Server Status: Checking...
             </div>
         </div>
@@ -232,114 +296,107 @@
         <div class="content">
             <!-- Security Check -->
             <div id="securitySection" class="section security-section">
-                <h3>လုံခြုံရေးစစ်ဆေးခြင်း</h3>
-                <input type="password" id="password" placeholder="Vendor password ထည့်ပါ">
-                <button class="btn btn-generate" onclick="checkSecurity()">ဝင်ရောက်ရန်</button>
+                <div class="section-title">🔒 Security Authentication</div>
+                <input type="password" id="password" placeholder="Enter vendor password">
+                <button class="btn btn-generate" onclick="checkSecurity()" style="margin-top: 15px;">
+                    🔑 Authenticate
+                </button>
             </div>
             
-            <!-- Main Content (Hidden until security check) -->
-            <div id="mainContent" class="section main-content">
-                <div class="popup-notice">
-                    📢 <strong>Smart Connection System</strong> - Automatic server detection with fallback!
+            <!-- Main Content -->
+            <div id="mainContent" class="main-content">
+                <div class="alert alert-warning">
+                    📢 <strong>Smart Connection System</strong> - Automatic server detection
                 </div>
 
                 <!-- Connection Info -->
-                <div class="connection-method">
-                    <strong>🔄 Connection Method:</strong> 
-                    <span id="connectionMethod">Smart Detection</span>
+                <div class="connection-info">
+                    <strong>🔄 Connection:</strong> 
+                    <span id="connectionMethod">Ready</span>
                 </div>
 
-                <!-- Success Message -->
-                <div id="successMessage" class="success-message" style="display: none;">
-                    ✅ <strong>Success!</strong> Key generated successfully!
-                </div>
-
-                <!-- Test Connection Buttons -->
+                <!-- Test Connection -->
                 <div class="test-buttons">
-                    <button class="btn" onclick="testAllConnections()" style="background: #17a2b8; color: white;">Test All Connection Methods</button>
+                    <button class="btn btn-test" onclick="testConnection()">
+                        🔍 Test Connection
+                    </button>
                 </div>
 
-                <!-- Local Key Warning -->
-                <div id="localKeyWarning" class="local-key-warning" style="display: none;">
-                    ⚠️ <strong>Local Key Generation Active</strong> - Server connection failed. 
-                    Locally generated keys have limited security and should be used temporarily only.
-                </div>
-                
                 <!-- System ID Input -->
                 <div class="section">
-                    <h3>Customer System ID</h3>
-                    <input type="text" id="systemId" placeholder="Enter customer's System ID (e.g., ABC-123-DEF)">
+                    <div class="section-title">🆔 Customer System ID</div>
+                    <input type="text" id="systemId" placeholder="Enter customer's System ID">
                     <div style="font-size: 12px; color: #666; margin-top: 5px;">
-                        💡 Tell your customer to copy System ID from the application
+                        💡 Customer can find this in their application
                     </div>
                 </div>
                 
                 <!-- License Type Selection -->
                 <div class="section">
-                    <h3>လိုင်စင်ကာလရွေးချယ်ရန်</h3>
-                    <div class="license-option">
-                        <input type="radio" id="2days" name="duration" value="2days" checked onchange="updateExpiryInfo()">
-                        <label for="2days">၂ ရက်စမ်းသုံးရန်</label>
-                    </div>
-                    <div class="license-option">
-                        <input type="radio" id="1month" name="duration" value="1month" onchange="updateExpiryInfo()">
-                        <label for="1month">၁ လ လိုင်စင်</label>
-                    </div>
-                    <div class="license-option">
-                        <input type="radio" id="3months" name="duration" value="3months" onchange="updateExpiryInfo()">
-                        <label for="3months">၃ လ လိုင်စင်</label>
-                    </div>
-                    <div class="license-option">
-                        <input type="radio" id="6months" name="duration" value="6months" onchange="updateExpiryInfo()">
-                        <label for="6months">၆ လ လိုင်စင်</label>
-                    </div>
-                    <div class="license-option">
-                        <input type="radio" id="12months" name="duration" value="12months" onchange="updateExpiryInfo()">
-                        <label for="12months">၁၂ လ လိုင်စင်</label>
+                    <div class="section-title">📅 License Duration</div>
+                    <div class="license-options">
+                        <label class="license-option" onclick="selectDuration('2days')">
+                            <input type="radio" name="duration" value="2days" checked> 
+                            <span>2 Days Trial</span>
+                        </label>
+                        <label class="license-option" onclick="selectDuration('1month')">
+                            <input type="radio" name="duration" value="1month"> 
+                            <span>1 Month License</span>
+                        </label>
+                        <label class="license-option" onclick="selectDuration('3months')">
+                            <input type="radio" name="duration" value="3months"> 
+                            <span>3 Months License</span>
+                        </label>
+                        <label class="license-option" onclick="selectDuration('6months')">
+                            <input type="radio" name="duration" value="6months"> 
+                            <span>6 Months License</span>
+                        </label>
+                        <label class="license-option" onclick="selectDuration('12months')">
+                            <input type="radio" name="duration" value="12months"> 
+                            <span>12 Months License</span>
+                        </label>
                     </div>
                 </div>
                 
                 <!-- Expiry Information -->
                 <div id="expiryInfo" class="info-box">
-                    📅 လိုင်စင်ကုန်ဆုံးမည့်ရက်: <br>
-                    ⏰ ကာလ: 
+                    📅 <strong>Expiry Date:</strong> Calculating...<br>
+                    ⏰ <strong>Duration:</strong> 2 Days Trial
                 </div>
                 
                 <!-- Loading Indicator -->
                 <div id="loading" class="loading">
-                    <p id="loadingText">🔄 Testing connection methods...</p>
+                    <div class="loading-spinner"></div>
+                    <p id="loadingText">Connecting to server...</p>
                 </div>
                 
                 <!-- Generate Button -->
-                <button class="btn btn-generate" onclick="generateKeySmart()" style="width: 100%; padding: 15px;">
-                    🚀 Generate Activation Key (Smart)
+                <button class="btn btn-generate" onclick="generateKey()" id="generateBtn">
+                    🚀 Generate Activation Key
                 </button>
                 
                 <!-- Generated Key Display -->
                 <div class="section">
-                    <h3>ထုတ်လိုက်သော Activation Key</h3>
+                    <div class="section-title">🔑 Generated Key</div>
                     <div id="keyDisplay" class="key-display">
-                        Key မထုတ်ရသေးပါ
-                    </div>
-                    <div style="font-size: 12px; color: #666; margin-top: 5px;">
-                        📋 Give this key to your customer to activate their software
+                        No key generated yet
                     </div>
                 </div>
                 
                 <!-- Action Buttons -->
                 <div class="action-buttons">
-                    <button class="btn btn-copy" onclick="copyToClipboard()">Clipboard ကိုကူးရန်</button>
-                    <button class="btn btn-new" onclick="generateNewKey()">နောက်ထပ်ထုတ်ရန်</button>
-                    <button class="btn btn-close" onclick="closeGenerator()">ပိတ်ရန်</button>
+                    <button class="btn btn-copy" onclick="copyToClipboard()">
+                        📋 Copy Key
+                    </button>
+                    <button class="btn btn-new" onclick="generateNewKey()">
+                        🔄 New Key
+                    </button>
                 </div>
 
-                <!-- Used Keys List -->
-                <div class="section">
-                    <h3>Recently Generated Keys</h3>
-                    <div id="usedKeysList" class="used-keys">
-                        <!-- Used keys will be displayed here -->
-                    </div>
-                </div>
+                <!-- Close Button -->
+                <button class="btn btn-close" onclick="closeGenerator()" style="width: 100%; margin-top: 10px;">
+                    ❌ Close
+                </button>
             </div>
         </div>
     </div>
@@ -349,38 +406,21 @@
         const SERVER_URL = "http://myactivation.infinityfreeapp.com/validate.php";
         
         let currentKey = "";
-        let usedKeys = JSON.parse(localStorage.getItem('usedKeys')) || [];
+        let currentDuration = "2days";
         
-        // Initialize local key tracking
-        const LOCAL_KEYS_STORAGE = 'localGeneratedKeys';
-        
-        function initializeLocalKeys() {
-            if (!localStorage.getItem(LOCAL_KEYS_STORAGE)) {
-                localStorage.setItem(LOCAL_KEYS_STORAGE, JSON.stringify([]));
-            }
-        }
-        
-        function getLocalGeneratedKeys() {
-            return JSON.parse(localStorage.getItem(LOCAL_KEYS_STORAGE)) || [];
-        }
-        
-        function saveLocalGeneratedKey(keyData) {
-            const localKeys = getLocalGeneratedKeys();
-            localKeys.unshift({
-                key: keyData.raw_key,
-                systemId: keyData.system_id,
-                duration: keyData.duration,
-                timestamp: new Date().toLocaleString(),
-                expiry: calculateExpiryDate(keyData.duration),
-                formatted_key: keyData.formatted_key
+        // Initialize
+        function init() {
+            updateExpiryInfo();
+            checkServerStatus();
+            
+            // Enter key support
+            document.getElementById('password').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') checkSecurity();
             });
             
-            // Keep only last 50 local keys
-            if (localKeys.length > 50) {
-                localKeys.splice(50);
-            }
-            
-            localStorage.setItem(LOCAL_KEYS_STORAGE, JSON.stringify(localKeys));
+            document.getElementById('systemId').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') generateKey();
+            });
         }
         
         function checkSecurity() {
@@ -389,22 +429,28 @@
             if (password === VENDOR_PASSWORD) {
                 document.getElementById('securitySection').style.display = 'none';
                 document.getElementById('mainContent').style.display = 'block';
-                updateExpiryInfo();
-                initializeLocalKeys();
-                displayUsedKeys();
-                checkServerStatus();
+                showAlert('✅ Authentication successful!', 'success');
             } else {
-                alert('❌ Password မှားနေပါတယ်');
+                showAlert('❌ Invalid password!', 'danger');
             }
         }
         
+        function selectDuration(duration) {
+            currentDuration = duration;
+            document.querySelectorAll('.license-option').forEach(opt => {
+                opt.classList.remove('selected');
+            });
+            event.currentTarget.classList.add('selected');
+            updateExpiryInfo();
+        }
+        
         function updateExpiryInfo() {
-            const duration = document.querySelector('input[name="duration"]:checked').value;
-            const expiryDate = calculateExpiryDate(duration);
-            const durationText = getDurationDisplay(duration);
+            const expiryDate = calculateExpiryDate(currentDuration);
+            const durationText = getDurationDisplay(currentDuration);
             
             document.getElementById('expiryInfo').innerHTML = 
-                `📅 လိုင်စင်ကုန်ဆုံးမည့်ရက်: ${expiryDate}<br>⏰ ကာလ: ${durationText}`;
+                `📅 <strong>Expiry Date:</strong> ${expiryDate}<br>
+                 ⏰ <strong>Duration:</strong> ${durationText}`;
         }
         
         function calculateExpiryDate(duration) {
@@ -412,21 +458,11 @@
             let expiryDate = new Date();
             
             switch(duration) {
-                case '2days':
-                    expiryDate.setDate(now.getDate() + 2);
-                    break;
-                case '1month':
-                    expiryDate.setMonth(now.getMonth() + 1);
-                    break;
-                case '3months':
-                    expiryDate.setMonth(now.getMonth() + 3);
-                    break;
-                case '6months':
-                    expiryDate.setMonth(now.getMonth() + 6);
-                    break;
-                case '12months':
-                    expiryDate.setFullYear(now.getFullYear() + 1);
-                    break;
+                case '2days': expiryDate.setDate(now.getDate() + 2); break;
+                case '1month': expiryDate.setMonth(now.getMonth() + 1); break;
+                case '3months': expiryDate.setMonth(now.getMonth() + 3); break;
+                case '6months': expiryDate.setMonth(now.getMonth() + 6); break;
+                case '12months': expiryDate.setFullYear(now.getFullYear() + 1); break;
             }
             
             return expiryDate.toISOString().split('T')[0];
@@ -434,304 +470,113 @@
         
         function getDurationDisplay(duration) {
             const durationMap = {
-                "2days": "၂ ရက်",
-                "1month": "၁ လ",
-                "3months": "၃ လ",
-                "6months": "၆ လ", 
-                "12months": "၁၂ လ"
+                "2days": "2 Days Trial",
+                "1month": "1 Month License", 
+                "3months": "3 Months License",
+                "6months": "6 Months License",
+                "12months": "12 Months License"
             };
             return durationMap[duration] || duration;
         }
         
-        // SMART KEY GENERATION - Multiple connection methods
-        async function generateKeySmart() {
+        // SIMPLIFIED KEY GENERATION
+        async function generateKey() {
             const systemId = document.getElementById('systemId').value.trim();
-            const duration = document.querySelector('input[name="duration"]:checked').value;
             
             if (!systemId) {
-                alert('Please enter customer System ID');
+                showAlert('❌ Please enter customer System ID', 'danger');
                 return;
             }
             
-            // Reset UI
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('localKeyWarning').style.display = 'none';
-            document.getElementById('successMessage').style.display = 'none';
-            document.getElementById('connectionMethod').textContent = "Testing connection methods...";
+            // Show loading
+            showLoading(true);
+            document.getElementById('generateBtn').disabled = true;
             
-            // Method 1: Try JSONP first (no CORS issues)
-            document.getElementById('loadingText').textContent = "🔄 Trying JSONP method...";
             try {
-                const jsonpResult = await jsonpKeyGeneration(systemId, duration);
-                if (jsonpResult.success) {
-                    handleSuccess(jsonpResult.data, systemId, duration, "JSONP");
-                    return;
+                // Try JSONP method first
+                const result = await generateWithJSONP(systemId, currentDuration);
+                
+                if (result.success) {
+                    handleSuccess(result.data, systemId, "JSONP");
+                } else {
+                    // Fallback to local generation
+                    await generateLocalKeyFallback(systemId, currentDuration);
                 }
             } catch (error) {
-                console.log('JSONP failed:', error);
+                console.error('Generation error:', error);
+                await generateLocalKeyFallback(systemId, currentDuration);
+            } finally {
+                showLoading(false);
+                document.getElementById('generateBtn').disabled = false;
             }
-
-            // Method 2: Try direct fetch with mode 'no-cors'
-            document.getElementById('loadingText').textContent = "🔄 Trying direct fetch...";
-            try {
-                const directResult = await directFetchKeyGeneration(systemId, duration);
-                if (directResult.success) {
-                    handleSuccess(directResult.data, systemId, duration, "Direct Fetch");
-                    return;
-                }
-            } catch (error) {
-                console.log('Direct fetch failed:', error);
-            }
-
-            // Method 3: Try form submission
-            document.getElementById('loadingText').textContent = "🔄 Trying form submission...";
-            try {
-                const formResult = await formSubmissionKeyGeneration(systemId, duration);
-                if (formResult.success) {
-                    handleSuccess(formResult.data, systemId, duration, "Form Submission");
-                    return;
-                }
-            } catch (error) {
-                console.log('Form submission failed:', error);
-            }
-
-            // All methods failed - use local generation
-            document.getElementById('loadingText').textContent = "🔄 All methods failed, using local generation...";
-            await generateLocalKeyFallback(systemId, duration);
         }
         
-        // Method 1: JSONP Key Generation (Improved)
-        function jsonpKeyGeneration(systemId, duration) {
+        // JSONP Key Generation
+        function generateWithJSONP(systemId, duration) {
             return new Promise((resolve) => {
-                const callbackName = 'keyGenCallback_' + Date.now();
+                const callbackName = 'jsonpCallback_' + Date.now();
                 const script = document.createElement('script');
                 
-                // Create URL with parameters
-                const params = new URLSearchParams({
-                    action: 'generate',
-                    system_id: systemId,
-                    duration: duration,
-                    vendor_password: 'VENDOR123',
-                    callback: callbackName,
-                    _: Date.now() // Prevent caching
-                });
+                const url = `${SERVER_URL}?callback=${callbackName}&action=generate&system_id=${systemId}&duration=${duration}&vendor_password=VENDOR123&_=${Date.now()}`;
+                script.src = url;
                 
-                script.src = SERVER_URL + '?' + params.toString();
-                
-                window[callbackName] = function(data) {
+                window[callbackName] = function(response) {
                     document.head.removeChild(script);
                     delete window[callbackName];
-                    
-                    if (data && data.success) {
-                        resolve({ success: true, data: data.data });
-                    } else {
-                        resolve({ success: false });
-                    }
+                    resolve(response);
                 };
                 
                 script.onerror = function() {
                     document.head.removeChild(script);
                     delete window[callbackName];
-                    resolve({ success: false });
+                    resolve({ success: false, error: 'JSONP failed' });
                 };
                 
                 document.head.appendChild(script);
                 
-                // Timeout
+                // Timeout after 10 seconds
                 setTimeout(() => {
                     if (window[callbackName]) {
                         document.head.removeChild(script);
                         delete window[callbackName];
-                        resolve({ success: false });
+                        resolve({ success: false, error: 'Timeout' });
                     }
                 }, 10000);
             });
         }
         
-        // Method 2: Direct Fetch with no-cors mode
-        async function directFetchKeyGeneration(systemId, duration) {
-            try {
-                // First try with CORS
-                const response = await fetch(SERVER_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        action: 'generate',
-                        system_id: systemId,
-                        duration: duration,
-                        vendor_password: 'VENDOR123'
-                    })
-                });
-                
-                if (response.ok) {
-                    const result = await response.json();
-                    if (result.success) {
-                        return { success: true, data: result.data };
-                    }
-                }
-            } catch (error) {
-                // If CORS fails, try with no-cors mode (but we can't read response)
-                try {
-                    await fetch(SERVER_URL, {
-                        method: 'POST',
-                        mode: 'no-cors',
-                        body: JSON.stringify({
-                            action: 'generate',
-                            system_id: systemId,
-                            duration: duration,
-                            vendor_password: 'VENDOR123'
-                        })
-                    });
-                    // If we get here, the request was sent but we can't read response
-                    // So we'll consider this a partial success and use local generation
-                } catch (noCorsError) {
-                    // Ignore no-cors error
-                }
-            }
-            
-            return { success: false };
-        }
-        
-        // Method 3: Form Submission
-        function formSubmissionKeyGeneration(systemId, duration) {
-            return new Promise((resolve) => {
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = SERVER_URL;
-                form.target = '_blank';
-                form.style.display = 'none';
-                
-                // Add all payload fields as hidden inputs
-                const fields = {
-                    action: 'generate',
-                    system_id: systemId,
-                    duration: duration,
-                    vendor_password: 'VENDOR123'
-                };
-                
-                for (const [key, value] of Object.entries(fields)) {
-                    const input = document.createElement('input');
-                    input.type = 'hidden';
-                    input.name = key;
-                    input.value = value;
-                    form.appendChild(input);
-                }
-                
-                document.body.appendChild(form);
-                
-                // We can't easily get the response, so we'll consider this a failure
-                setTimeout(() => {
-                    document.body.removeChild(form);
-                    resolve({ success: false });
-                }, 3000);
-                
-                form.submit();
-            });
-        }
-        
-        // Handle successful key generation
-        function handleSuccess(keyData, systemId, duration, method) {
-            currentKey = keyData.raw_key;
-            
-            // Save to used keys
-            const keyRecord = {
-                key: keyData.raw_key,
-                formatted_key: keyData.formatted_key,
-                systemId: systemId,
-                duration: duration,
-                timestamp: new Date().toLocaleString(),
-                expiry: calculateExpiryDate(duration),
-                local_generated: false,
-                method: method
-            };
-            
-            usedKeys.unshift(keyRecord);
-            
-            // Keep only last 20 keys
-            if (usedKeys.length > 20) {
-                usedKeys = usedKeys.slice(0, 20);
-            }
-            
-            localStorage.setItem('usedKeys', JSON.stringify(usedKeys));
-            
-            const displayText = `System ID: ${systemId}\nလိုင်စင်အမျိုးအစား: ${getDurationDisplay(duration)}\nActivation Key: ${keyData.formatted_key}\nRaw Key: ${keyData.raw_key}\nGenerated: ${new Date().toLocaleString()}\nMethod: ${method} ✅`;
-            document.getElementById('keyDisplay').textContent = displayText;
-            
-            document.getElementById('connectionMethod').textContent = `${method} ✅`;
-            document.getElementById('serverStatus').className = 'server-status server-online';
-            document.getElementById('serverStatus').textContent = `🟢 Server Online - ${method}`;
-            document.getElementById('successMessage').style.display = 'block';
-            
-            document.getElementById('loading').style.display = 'none';
-            
-            alert(`✅ Key generated successfully via ${method}!`);
-            displayUsedKeys();
-        }
-        
         // Local key generation fallback
         async function generateLocalKeyFallback(systemId, duration) {
-            try {
-                const localKey = generateLocalKey(systemId, duration);
-                
-                // Simulate the same response structure
-                const keyData = localKey;
-                currentKey = keyData.raw_key;
-                
-                // Save to used keys
-                const keyRecord = {
-                    key: keyData.raw_key,
-                    formatted_key: keyData.formatted_key,
-                    systemId: systemId,
-                    duration: duration,
-                    timestamp: new Date().toLocaleString(),
-                    expiry: calculateExpiryDate(duration),
-                    local_generated: true,
-                    method: 'local'
-                };
-                
-                usedKeys.unshift(keyRecord);
-                saveLocalGeneratedKey(keyData);
-                
-                // Keep only last 20 keys
-                if (usedKeys.length > 20) {
-                    usedKeys = usedKeys.slice(0, 20);
-                }
-                
-                localStorage.setItem('usedKeys', JSON.stringify(usedKeys));
-                
-                const displayText = `System ID: ${systemId}\nလိုင်စင်အမျိုးအစား: ${getDurationDisplay(duration)}\nActivation Key: ${keyData.formatted_key}\nRaw Key: ${keyData.raw_key}\nGenerated: ${new Date().toLocaleString()}\nMethod: Local Generation (Server Unavailable) ⚠️`;
-                document.getElementById('keyDisplay').textContent = displayText;
-                
-                document.getElementById('connectionMethod').textContent = "Local Generation ⚠️";
-                document.getElementById('localKeyWarning').style.display = 'block';
-                document.getElementById('loading').style.display = 'none';
-                
-                alert('⚠️ Using locally generated key (server connection failed)\n\nThis key will be tracked locally to prevent reuse.');
-                displayUsedKeys();
-                
-            } catch (localError) {
-                console.error('Local generation failed:', localError);
-                document.getElementById('loading').style.display = 'none';
-                alert('❌ All generation methods failed: ' + localError.message);
-            }
+            const localKey = generateLocalKey(systemId, duration);
+            currentKey = localKey.raw_key;
+            
+            const displayText = `System ID: ${systemId}
+License Type: ${getDurationDisplay(duration)}
+Activation Key: ${localKey.formatted_key}
+Raw Key: ${localKey.raw_key}
+Generated: ${new Date().toLocaleString()}
+Status: ⚠️ LOCAL GENERATION (Server Unavailable)`;
+            
+            document.getElementById('keyDisplay').textContent = displayText;
+            document.getElementById('connectionMethod').textContent = "Local Generation ⚠️";
+            document.getElementById('serverStatus').className = 'server-status server-offline';
+            document.getElementById('serverStatus').textContent = '🔴 Server Offline - Using Local';
+            
+            showAlert('⚠️ Using local generation (server unavailable)', 'warning');
         }
         
-        // Enhanced local key generation
+        // Local key generation
         function generateLocalKey(systemId, duration) {
             const durationMap = {
-                '2days': 'T',
-                '1month': 'M',
-                '3months': 'Q',
-                '6months': 'H',
-                '12months': 'Y'
+                '2days': 'T', '1month': 'M', '3months': 'Q', 
+                '6months': 'H', '12months': 'Y'
             };
             
             const durationCode = durationMap[duration] || 'T';
-            const timestamp = Date.now().toString();
             const random = Math.random().toString(36).substring(2, 15);
+            const timestamp = Date.now().toString();
             
+            // Create a simple hash
             let hash = '';
             const baseString = systemId + 'DENDI_SECURE' + durationCode + timestamp + random;
             
@@ -754,133 +599,71 @@
                 formatted_key: formattedKey,
                 duration: duration,
                 system_id: systemId,
-                local_generated: true,
-                timestamp: new Date().toISOString()
+                local_generated: true
             };
         }
         
-        // Test all connection methods
-        async function testAllConnections() {
-            alert('Testing all connection methods...\n\nThis will test:\n1. JSONP Method\n2. Direct Fetch\n3. Form Submission');
+        // Handle successful key generation
+        function handleSuccess(keyData, systemId, method) {
+            currentKey = keyData.raw_key;
             
-            document.getElementById('serverStatus').textContent = '🔄 Testing all methods...';
+            const displayText = `System ID: ${systemId}
+License Type: ${getDurationDisplay(keyData.duration)}
+Activation Key: ${keyData.formatted_key}
+Raw Key: ${keyData.raw_key}
+Generated: ${new Date().toLocaleString()}
+Status: ✅ SERVER GENERATION (${method})`;
             
-            // Test each method
-            const methods = [
-                { name: 'JSONP', test: () => jsonpKeyGeneration('TEST123', '1month') },
-                { name: 'Direct Fetch', test: () => directFetchKeyGeneration('TEST123', '1month') }
-            ];
+            document.getElementById('keyDisplay').textContent = displayText;
+            document.getElementById('connectionMethod').textContent = `${method} ✅`;
+            document.getElementById('serverStatus').className = 'server-status server-online';
+            document.getElementById('serverStatus').textContent = '🟢 Server Online';
             
-            let workingMethods = [];
-            
-            for (const method of methods) {
-                try {
-                    const result = await method.test();
-                    if (result.success) {
-                        workingMethods.push(method.name);
-                    }
-                } catch (error) {
-                    // Method failed
-                }
-            }
-            
-            if (workingMethods.length > 0) {
-                document.getElementById('serverStatus').className = 'server-status server-online';
-                document.getElementById('serverStatus').textContent = `🟢 Server Accessible via: ${workingMethods.join(', ')}`;
-                alert(`✅ Working connection methods:\n${workingMethods.join('\n')}`);
-            } else {
-                document.getElementById('serverStatus').className = 'server-status server-offline';
-                document.getElementById('serverStatus').textContent = '🔴 All connection methods failed';
-                alert('❌ All connection methods failed. Using local generation fallback.');
-            }
+            showAlert('✅ Key generated successfully!', 'success');
         }
         
-        function displayUsedKeys() {
-            const usedKeysList = document.getElementById('usedKeysList');
-            const allKeys = [...usedKeys];
+        // Test connection
+        async function testConnection() {
+            showLoading(true);
             
-            if (allKeys.length === 0) {
-                usedKeysList.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">No keys generated yet</p>';
-                return;
-            }
-            
-            let html = '';
-            allKeys.slice(0, 10).forEach((key, index) => {
-                const isLocal = key.local_generated;
-                const itemClass = isLocal ? 'used-key-item local' : 'used-key-item';
-                const icon = isLocal ? '🔸' : '🔹';
-                const typeText = isLocal ? ' (Local)' : ' (Server)';
-                const method = key.method || 'unknown';
+            try {
+                const result = await generateWithJSONP('TEST123', '1month');
                 
-                html += `
-                    <div class="${itemClass}">
-                        <div class="key-info">
-                            ${icon} <strong>${key.systemId}</strong>${typeText} - ${method}
-                        </div>
-                        <div class="key-value">${key.formatted_key}</div>
-                        <div class="key-info">
-                            ${getDurationDisplay(key.duration)} | ${key.timestamp}
-                        </div>
-                    </div>
-                `;
-            });
-            
-            usedKeysList.innerHTML = html;
-        }
-        
-        function copyToClipboard() {
-            if (currentKey) {
-                navigator.clipboard.writeText(currentKey).then(() => {
-                    alert('✅ Activation Key copied to clipboard!');
-                }).catch(err => {
-                    // Fallback for older browsers
-                    const textArea = document.createElement('textarea');
-                    textArea.value = currentKey;
-                    document.body.appendChild(textArea);
-                    textArea.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(textArea);
-                    alert('✅ Activation Key copied to clipboard!');
-                });
-            } else {
-                alert('⚠️ No key generated yet');
+                if (result.success) {
+                    showAlert('✅ Connection test successful!', 'success');
+                    document.getElementById('serverStatus').className = 'server-status server-online';
+                    document.getElementById('serverStatus').textContent = '🟢 Server Online';
+                } else {
+                    showAlert('❌ Connection test failed', 'danger');
+                    document.getElementById('serverStatus').className = 'server-status server-offline';
+                    document.getElementById('serverStatus').textContent = '🔴 Server Offline';
+                }
+            } catch (error) {
+                showAlert('❌ Connection test failed', 'danger');
+                document.getElementById('serverStatus').className = 'server-status server-offline';
+                document.getElementById('serverStatus').textContent = '🔴 Server Offline';
+            } finally {
+                showLoading(false);
             }
         }
         
-        function generateNewKey() {
-            document.getElementById('systemId').value = '';
-            document.getElementById('keyDisplay').textContent = 'Key မထုတ်ရသေးပါ';
-            document.getElementById('localKeyWarning').style.display = 'none';
-            document.getElementById('successMessage').style.display = 'none';
-            document.getElementById('connectionMethod').textContent = "Smart Detection";
-            currentKey = '';
-        }
-        
-        function closeGenerator() {
-            if (confirm('Key Generator ကိုပိတ်မှာသေချာပါသလား?')) {
-                window.close();
-            }
-        }
-        
-        // Check server status using JSONP
+        // Check server status
         function checkServerStatus() {
             const callbackName = 'statusCallback_' + Date.now();
             const script = document.createElement('script');
             
-            script.src = SERVER_URL + '?callback=' + callbackName + '&_=' + Date.now();
+            script.src = `${SERVER_URL}?callback=${callbackName}&_=${Date.now()}`;
             
             window[callbackName] = function(data) {
                 document.getElementById('serverStatus').className = 'server-status server-online';
-                document.getElementById('serverStatus').innerHTML = 
-                    `🟢 Server Online: ${data.service} v${data.version}`;
-                
+                document.getElementById('serverStatus').textContent = `🟢 ${data.service} v${data.version}`;
                 document.head.removeChild(script);
                 delete window[callbackName];
             };
 
             script.onerror = function() {
                 document.getElementById('serverStatus').className = 'server-status server-offline';
-                document.getElementById('serverStatus').textContent = '🔴 Server Offline - Using Local Fallback';
+                document.getElementById('serverStatus').textContent = '🔴 Server Offline';
                 document.head.removeChild(script);
                 delete window[callbackName];
             };
@@ -888,25 +671,64 @@
             document.head.appendChild(script);
         }
         
-        // Enter key support
-        document.getElementById('password').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                checkSecurity();
-            }
-        });
+        // Utility functions
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+            document.getElementById('loadingText').textContent = show ? 'Connecting to server...' : '';
+        }
         
-        document.getElementById('systemId').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                generateKeySmart();
-            }
-        });
+        function showAlert(message, type) {
+            // Remove existing alerts
+            const existingAlert = document.querySelector('.alert:not(.alert-warning)');
+            if (existingAlert) existingAlert.remove();
+            
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            alert.style.marginTop = '15px';
+            
+            document.getElementById('mainContent').insertBefore(alert, document.getElementById('mainContent').firstChild);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                if (alert.parentNode) alert.remove();
+            }, 5000);
+        }
         
-        // Initialize
-        document.addEventListener('DOMContentLoaded', function() {
-            updateExpiryInfo();
-            initializeLocalKeys();
-            displayUsedKeys();
-        });
+        function copyToClipboard() {
+            if (currentKey) {
+                navigator.clipboard.writeText(currentKey).then(() => {
+                    showAlert('✅ Key copied to clipboard!', 'success');
+                }).catch(() => {
+                    // Fallback
+                    const textArea = document.createElement('textarea');
+                    textArea.value = currentKey;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    showAlert('✅ Key copied to clipboard!', 'success');
+                });
+            } else {
+                showAlert('⚠️ No key to copy', 'warning');
+            }
+        }
+        
+        function generateNewKey() {
+            document.getElementById('systemId').value = '';
+            document.getElementById('keyDisplay').textContent = 'No key generated yet';
+            document.getElementById('connectionMethod').textContent = "Ready";
+            currentKey = '';
+        }
+        
+        function closeGenerator() {
+            if (confirm('Close the key generator?')) {
+                window.close();
+            }
+        }
+        
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
 </html>
