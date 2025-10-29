@@ -1,12 +1,19 @@
 <?php
+// Enhanced CORS headers for cross-origin requests
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST, GET, OPTIONS, DELETE, PUT');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+header('Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, Accept, Origin');
+header('Access-Control-Max-Age: 86400');
+header('Access-Control-Allow-Credentials: true');
 
-// Preflight request handling
+// Handle preflight OPTIONS request
 if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
+    http_response_code(200);
     exit(0);
 }
+
+// Set content type to JSON
+header('Content-Type: application/json; charset=utf-8');
 
 // Configuration - CHANGE THIS SECRET KEY!
 $secret_key = "DENDI_SECURE_KEY_2025_V2";
@@ -175,6 +182,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $input = $_POST;
     }
     
+    // If still empty, try GET parameters (for testing)
+    if (empty($input) && !empty($_GET)) {
+        $input = $_GET;
+    }
+    
     $system_id = isset($input['system_id']) ? trim($input['system_id']) : '';
     $activation_key = isset($input['activation_key']) ? trim($input['activation_key']) : '';
     $action = isset($input['action']) ? $input['action'] : '';
@@ -183,6 +195,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
     // Vendor password for key generation
     $valid_vendor_password = "VENDOR123";
+    
+    // Log the request for debugging
+    file_put_contents('debug_log.txt', date('Y-m-d H:i:s') . " - Action: " . $action . " - SystemID: " . $system_id . "\n", FILE_APPEND);
     
     if ($action === 'validate') {
         if (empty($system_id) || empty($activation_key)) {
@@ -208,16 +223,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
 } elseif ($_SERVER['REQUEST_METHOD'] == 'GET') {
     // Simple status check
+    $used_keys = loadUsedKeys();
     echo json_encode(array(
         'status' => 'active', 
         'service' => 'Activation Key Server', 
         'version' => '2.0',
-        'used_keys_count' => count(loadUsedKeys()),
-        'timestamp' => date('Y-m-d H:i:s')
+        'used_keys_count' => count($used_keys),
+        'timestamp' => date('Y-m-d H:i:s'),
+        'cors_enabled' => true,
+        'endpoints' => [
+            'GET' => 'Server status',
+            'POST' => 'Key validation/generation'
+        ]
     ));
 } else {
     echo json_encode(array('valid' => false, 'error' => 'Only POST and GET requests allowed'));
 }
 ?>
-
-
