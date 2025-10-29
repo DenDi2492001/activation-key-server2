@@ -202,29 +202,32 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
 } elseif ($_SERVER['REQUEST_METHOD'] == 'GET') {
     // Handle JSONP callback for GET requests
-    if (isset($_GET['callback']) && isset($_GET['action']) && $_GET['action'] === 'generate') {
-        $callback = $_GET['callback'];
-        $system_id = isset($_GET['system_id']) ? trim($_GET['system_id']) : '';
-        $duration = isset($_GET['duration']) ? $_GET['duration'] : '';
-        $vendor_password = isset($_GET['vendor_password']) ? $_GET['vendor_password'] : '';
-        
-        $valid_vendor_password = "VENDOR123";
-        
-        if ($vendor_password === $valid_vendor_password && !empty($system_id) && !empty($duration)) {
-            $result = generateActivationKey($system_id, $duration, $secret_key);
-            $response = array('success' => true, 'data' => $result);
-        } else {
-            $response = array('success' => false, 'error' => 'Invalid parameters or unauthorized');
-        }
-        
-        header('Content-Type: application/javascript');
-        echo $callback . '(' . json_encode($response) . ');';
-        exit;
-    }
-    
-    // Handle JSONP status check
     if (isset($_GET['callback'])) {
         $callback = $_GET['callback'];
+        
+        // Set proper content type for JSONP
+        header('Content-Type: application/javascript; charset=utf-8');
+        
+        // Handle different actions for JSONP
+        if (isset($_GET['action']) && $_GET['action'] === 'generate') {
+            $system_id = isset($_GET['system_id']) ? trim($_GET['system_id']) : '';
+            $duration = isset($_GET['duration']) ? $_GET['duration'] : '';
+            $vendor_password = isset($_GET['vendor_password']) ? $_GET['vendor_password'] : '';
+            
+            $valid_vendor_password = "VENDOR123";
+            
+            if ($vendor_password === $valid_vendor_password && !empty($system_id) && !empty($duration)) {
+                $result = generateActivationKey($system_id, $duration, $secret_key);
+                $response = array('success' => true, 'data' => $result);
+            } else {
+                $response = array('success' => false, 'error' => 'Invalid parameters or unauthorized');
+            }
+            
+            echo $callback . '(' . json_encode($response) . ');';
+            exit;
+        }
+        
+        // Default status check for JSONP
         $data = array(
             'status' => 'active', 
             'service' => 'Activation Key Server', 
@@ -232,12 +235,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             'used_keys_count' => count(loadUsedKeys()),
             'timestamp' => date('Y-m-d H:i:s')
         );
-        header('Content-Type: application/javascript');
         echo $callback . '(' . json_encode($data) . ');';
         exit;
     }
     
-    // Simple status check
+    // Simple status check for regular GET
     echo json_encode(array(
         'status' => 'active', 
         'service' => 'Activation Key Server', 
