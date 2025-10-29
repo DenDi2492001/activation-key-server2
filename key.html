@@ -199,6 +199,15 @@
             background: #f8f9fa;
             border-radius: 5px;
         }
+
+        .connection-method {
+            background: #e8f5e8;
+            border: 1px solid #28a745;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
@@ -221,14 +230,19 @@
             <!-- Main Content (Hidden until security check) -->
             <div id="mainContent" class="section main-content">
                 <div class="popup-notice">
-                    📢 <strong>Note:</strong> Key generation will open a popup window for server connection.
-                    Please allow popups for this website.
+                    📢 <strong>New Direct Connection Method</strong> - No more proxy needed!
+                </div>
+
+                <!-- Connection Info -->
+                <div class="connection-method">
+                    <strong>🔄 Connection Method:</strong> 
+                    <span id="connectionMethod">Direct Server Connection</span>
                 </div>
 
                 <!-- Test Connection Buttons -->
                 <div class="test-buttons">
                     <button class="btn" onclick="testServerConnection()" style="background: #17a2b8; color: white;">Test Server Connection</button>
-                    <button class="btn" onclick="testDirectConnection()" style="background: #6f42c1; color: white;">Test Direct Connection</button>
+                    <button class="btn" onclick="testDirectConnection()" style="background: #6f42c1; color: white;">Test Direct Key Generation</button>
                 </div>
 
                 <!-- Local Key Warning -->
@@ -279,12 +293,12 @@
                 
                 <!-- Loading Indicator -->
                 <div id="loading" class="loading">
-                    <p>🔄 Connecting to server via proxy...</p>
+                    <p>🔄 Connecting to server directly...</p>
                 </div>
                 
                 <!-- Generate Button -->
-                <button class="btn btn-generate" onclick="generateKey()" style="width: 100%; padding: 15px;">
-                    Activation Key ထုတ်ရန်
+                <button class="btn btn-generate" onclick="generateKeyDirect()" style="width: 100%; padding: 15px;">
+                    🔑 Generate Activation Key (Direct)
                 </button>
                 
                 <!-- Generated Key Display -->
@@ -318,13 +332,10 @@
 
     <script>
         const VENDOR_PASSWORD = "VENDOR123";
-        const PROXY_URL = "https://dendi2492001.github.io/activation-key-server2/proxy.html";
         const SERVER_URL = "http://myactivation.infinityfreeapp.com/validate.php";
         
         let currentKey = "";
         let usedKeys = JSON.parse(localStorage.getItem('usedKeys')) || [];
-        let currentProxyWindow = null;
-        let messageHandler = null;
         
         // Initialize local key tracking
         const LOCAL_KEYS_STORAGE = 'localGeneratedKeys';
@@ -418,7 +429,8 @@
             return durationMap[duration] || duration;
         }
         
-        function generateKey() {
+        // NEW: Direct key generation without proxy
+        async function generateKeyDirect() {
             const systemId = document.getElementById('systemId').value.trim();
             const duration = document.querySelector('input[name="duration"]:checked').value;
             
@@ -430,105 +442,187 @@
             // Show loading
             document.getElementById('loading').style.display = 'block';
             document.getElementById('localKeyWarning').style.display = 'none';
+            document.getElementById('connectionMethod').textContent = "Trying direct connection...";
             
             try {
-                // Open proxy window with ALL parameters
-                const proxyUrl = `${PROXY_URL}?action=generate&systemId=${encodeURIComponent(systemId)}&duration=${encodeURIComponent(duration)}`;
-                console.log('Opening proxy URL:', proxyUrl);
+                console.log('Starting direct key generation...');
                 
-                currentProxyWindow = window.open(proxyUrl, 'proxy', 'width=600,height=400,left=100,top=100');
-                
-                if (!currentProxyWindow) {
-                    throw new Error('Please allow popups for this website to generate keys');
-                }
-                
-                // Listen for result from proxy
-                messageHandler = function(event) {
-                    console.log('Received message:', event.data);
+                // Try direct fetch first
+                const payload = {
+                    action: 'generate',
+                    system_id: systemId,
+                    duration: duration,
+                    vendor_password: 'VENDOR123'
+                };
+
+                console.log('Sending request to:', SERVER_URL);
+                console.log('Payload:', payload);
+
+                // Use fetch with no-cors mode and timeout
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+                const response = await fetch(SERVER_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(payload),
+                    signal: controller.signal,
+                    mode: 'cors'
+                });
+
+                clearTimeout(timeoutId);
+
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('Server response:', result);
                     
-                    if (event.data.type === 'PROXY_RESULT') {
-                        const result = event.data.data;
+                    if (result.success) {
+                        const keyData = result.data;
+                        currentKey = keyData.raw_key;
                         
-                        if (result.success) {
-                            const keyData = result.data;
-                            currentKey = keyData.raw_key;
-                            
-                            // Save to used keys
-                            const keyRecord = {
-                                key: keyData.raw_key,
-                                formatted_key: keyData.formatted_key,
-                                systemId: systemId,
-                                duration: duration,
-                                timestamp: new Date().toLocaleString(),
-                                expiry: calculateExpiryDate(duration),
-                                local_generated: keyData.local_generated || false
-                            };
-                            
-                            usedKeys.unshift(keyRecord);
-                            
-                            // If locally generated, track it separately
-                            if (keyData.local_generated) {
-                                saveLocalGeneratedKey(keyData);
-                                document.getElementById('localKeyWarning').style.display = 'block';
-                            }
-                            
-                            // Keep only last 20 keys
-                            if (usedKeys.length > 20) {
-                                usedKeys = usedKeys.slice(0, 20);
-                            }
-                            
-                            localStorage.setItem('usedKeys', JSON.stringify(usedKeys));
-                            
-                            const displayText = `System ID: ${systemId}\nလိုင်စင်အမျိုးအစား: ${getDurationDisplay(duration)}\nActivation Key: ${keyData.formatted_key}\nRaw Key: ${keyData.raw_key}\nGenerated: ${new Date().toLocaleString()}`;
-                            document.getElementById('keyDisplay').textContent = displayText;
-                            
-                            if (keyData.local_generated) {
-                                alert('⚠️ Using locally generated key (server connection failed)\n\nThis key will be tracked locally to prevent reuse.');
-                            } else {
-                                alert('✅ Key generated successfully!');
-                            }
-                            
-                            displayUsedKeys();
-                            
-                        } else {
-                            alert('❌ Key generation failed: ' + (result.error || 'Unknown error'));
+                        // Save to used keys
+                        const keyRecord = {
+                            key: keyData.raw_key,
+                            formatted_key: keyData.formatted_key,
+                            systemId: systemId,
+                            duration: duration,
+                            timestamp: new Date().toLocaleString(),
+                            expiry: calculateExpiryDate(duration),
+                            local_generated: false,
+                            method: 'direct'
+                        };
+                        
+                        usedKeys.unshift(keyRecord);
+                        
+                        // Keep only last 20 keys
+                        if (usedKeys.length > 20) {
+                            usedKeys = usedKeys.slice(0, 20);
                         }
                         
-                        cleanup();
+                        localStorage.setItem('usedKeys', JSON.stringify(usedKeys));
                         
-                    } else if (event.data.type === 'PROXY_ERROR') {
-                        alert('❌ Server connection error: ' + event.data.error);
-                        cleanup();
-                    } else if (event.data.type === 'PROXY_WINDOW_CLOSED') {
-                        console.log('Proxy window was closed by user');
-                        cleanup();
+                        const displayText = `System ID: ${systemId}\nလိုင်စင်အမျိုးအစား: ${getDurationDisplay(duration)}\nActivation Key: ${keyData.formatted_key}\nRaw Key: ${keyData.raw_key}\nGenerated: ${new Date().toLocaleString()}\nMethod: Direct Server Connection ✅`;
+                        document.getElementById('keyDisplay').textContent = displayText;
+                        
+                        document.getElementById('connectionMethod').textContent = "Direct Server Connection ✅";
+                        document.getElementById('serverStatus').className = 'server-status server-online';
+                        document.getElementById('serverStatus').textContent = '🟢 Server Online - Direct Connection';
+                        
+                        alert('✅ Key generated successfully via direct connection!');
+                        displayUsedKeys();
+                        
+                    } else {
+                        throw new Error(result.error || 'Key generation failed');
                     }
-                };
-                
-                window.addEventListener('message', messageHandler);
-                
-                // Timeout after 30 seconds
-                setTimeout(() => {
-                    cleanup();
-                    alert('❌ Connection timeout. Please try again.');
-                }, 30000);
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
                 
             } catch (error) {
-                cleanup();
-                alert('❌ Error: ' + error.message);
+                console.error('Direct connection failed:', error);
+                
+                // Fallback to local generation
+                document.getElementById('connectionMethod').textContent = "Local Generation (Fallback)";
+                await generateLocalKeyFallback(systemId, duration);
+                
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+        
+        // Local key generation fallback
+        async function generateLocalKeyFallback(systemId, duration) {
+            try {
+                document.getElementById('localKeyWarning').style.display = 'block';
+                
+                const localKey = generateLocalKey(systemId, duration);
+                const localData = {
+                    success: true,
+                    data: localKey
+                };
+                
+                // Simulate the same response structure
+                const keyData = localData.data;
+                currentKey = keyData.raw_key;
+                
+                // Save to used keys
+                const keyRecord = {
+                    key: keyData.raw_key,
+                    formatted_key: keyData.formatted_key,
+                    systemId: systemId,
+                    duration: duration,
+                    timestamp: new Date().toLocaleString(),
+                    expiry: calculateExpiryDate(duration),
+                    local_generated: true,
+                    method: 'local'
+                };
+                
+                usedKeys.unshift(keyRecord);
+                saveLocalGeneratedKey(keyData);
+                
+                // Keep only last 20 keys
+                if (usedKeys.length > 20) {
+                    usedKeys = usedKeys.slice(0, 20);
+                }
+                
+                localStorage.setItem('usedKeys', JSON.stringify(usedKeys));
+                
+                const displayText = `System ID: ${systemId}\nလိုင်စင်အမျိုးအစား: ${getDurationDisplay(duration)}\nActivation Key: ${keyData.formatted_key}\nRaw Key: ${keyData.raw_key}\nGenerated: ${new Date().toLocaleString()}\nMethod: Local Generation (Server Unavailable) ⚠️`;
+                document.getElementById('keyDisplay').textContent = displayText;
+                
+                document.getElementById('connectionMethod').textContent = "Local Generation ⚠️";
+                
+                alert('⚠️ Using locally generated key (server connection failed)\n\nThis key will be tracked locally to prevent reuse.');
+                displayUsedKeys();
+                
+            } catch (localError) {
+                console.error('Local generation failed:', localError);
+                alert('❌ Both server and local generation failed: ' + localError.message);
+            }
+        }
+        
+        // Enhanced local key generation
+        function generateLocalKey(systemId, duration) {
+            const durationMap = {
+                '2days': 'T',
+                '1month': 'M',
+                '3months': 'Q',
+                '6months': 'H',
+                '12months': 'Y'
+            };
+            
+            const durationCode = durationMap[duration] || 'T';
+            const timestamp = Date.now().toString();
+            const random = Math.random().toString(36).substring(2, 15);
+            
+            let hash = '';
+            const baseString = systemId + 'DENDI_SECURE' + durationCode + timestamp + random;
+            
+            for (let i = 0; i < baseString.length; i++) {
+                const code = baseString.charCodeAt(i);
+                hash += ((code * (i + 1)) % 36).toString(36);
             }
             
-            function cleanup() {
-                document.getElementById('loading').style.display = 'none';
-                if (messageHandler) {
-                    window.removeEventListener('message', messageHandler);
-                }
-                if (currentProxyWindow && !currentProxyWindow.closed) {
-                    currentProxyWindow.close();
-                }
-                currentProxyWindow = null;
-                messageHandler = null;
-            }
+            hash = hash.substring(0, 15).toUpperCase().replace(/[^A-Z0-9]/g, '0');
+            const rawKey = durationCode + hash;
+            
+            const formattedKey = 
+                rawKey.substring(0, 4) + '-' +
+                rawKey.substring(4, 8) + '-' +
+                rawKey.substring(8, 12) + '-' +
+                rawKey.substring(12, 16);
+            
+            return {
+                raw_key: rawKey,
+                formatted_key: formattedKey,
+                duration: duration,
+                system_id: systemId,
+                local_generated: true,
+                timestamp: new Date().toISOString()
+            };
         }
         
         function displayUsedKeys() {
@@ -546,11 +640,12 @@
                 const itemClass = isLocal ? 'used-key-item local' : 'used-key-item';
                 const icon = isLocal ? '🔸' : '🔹';
                 const typeText = isLocal ? ' (Local)' : ' (Server)';
+                const method = key.method || 'unknown';
                 
                 html += `
                     <div class="${itemClass}">
                         <div class="key-info">
-                            ${icon} <strong>${key.systemId}</strong>${typeText}
+                            ${icon} <strong>${key.systemId}</strong>${typeText} - ${method}
                         </div>
                         <div class="key-value">${key.formatted_key}</div>
                         <div class="key-info">
@@ -586,6 +681,7 @@
             document.getElementById('systemId').value = '';
             document.getElementById('keyDisplay').textContent = 'Key မထုတ်ရသေးပါ';
             document.getElementById('localKeyWarning').style.display = 'none';
+            document.getElementById('connectionMethod').textContent = "Direct Server Connection";
             currentKey = '';
         }
         
@@ -595,28 +691,40 @@
             }
         }
         
-        // Test server connection
-        async function testServerConnection() {
+        // Test server connection using JSONP to avoid CORS
+        function testServerConnection() {
             try {
                 document.getElementById('serverStatus').className = 'server-status server-online';
                 document.getElementById('serverStatus').textContent = '🟢 Testing server connection...';
                 
-                const response = await fetch(SERVER_URL, {
-                    method: 'GET',
-                    mode: 'cors'
-                });
+                // Create script tag for JSONP
+                const script = document.createElement('script');
+                const callbackName = 'serverTestCallback_' + Date.now();
                 
-                if (response.ok) {
-                    const data = await response.json();
-                    document.getElementById('serverStatus').innerHTML = `🟢 Server Online: ${data.service} v${data.version}`;
-                    console.log('Server status:', data);
-                } else {
-                    throw new Error(`HTTP ${response.status}`);
-                }
+                script.src = SERVER_URL + '?callback=' + callbackName;
+                
+                window[callbackName] = function(data) {
+                    document.getElementById('serverStatus').className = 'server-status server-online';
+                    document.getElementById('serverStatus').innerHTML = 
+                        `🟢 Server Online: ${data.service} v${data.version}<br>Used Keys: ${data.used_keys_count}`;
+                    
+                    // Clean up
+                    document.head.removeChild(script);
+                    delete window[callbackName];
+                };
+
+                script.onerror = function() {
+                    document.getElementById('serverStatus').className = 'server-status server-offline';
+                    document.getElementById('serverStatus').textContent = '🔴 Server Offline: Connection failed';
+                    document.head.removeChild(script);
+                    delete window[callbackName];
+                };
+
+                document.head.appendChild(script);
+                
             } catch (error) {
                 document.getElementById('serverStatus').className = 'server-status server-offline';
-                document.getElementById('serverStatus').textContent = `🔴 Server Offline: ${error.message}`;
-                console.error('Server test failed:', error);
+                document.getElementById('serverStatus').textContent = '🔴 Server Test Error: ' + error.message;
             }
         }
         
@@ -632,13 +740,15 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                    'Accept': 'application/json'
                     },
                     body: JSON.stringify({
                         action: 'generate',
                         system_id: systemId,
                         duration: duration,
                         vendor_password: 'VENDOR123'
-                    })
+                    }),
+                    mode: 'cors'
                 });
                 
                 if (response.ok) {
@@ -666,7 +776,7 @@
         
         document.getElementById('systemId').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
-                generateKey();
+                generateKeyDirect();
             }
         });
         
