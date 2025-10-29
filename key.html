@@ -57,6 +57,7 @@
             margin: 15px 0;
             white-space: pre-wrap;
             word-wrap: break-word;
+            min-height: 100px;
         }
         
         .btn {
@@ -191,6 +192,13 @@
             font-weight: bold;
             color: #333;
         }
+
+        .test-buttons {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
     </style>
 </head>
 <body>
@@ -198,7 +206,7 @@
         <div class="header">
             <h1>Activation Key Generator - Vendor Portal</h1>
             <div id="serverStatus" class="server-status server-online">
-                🟢 Server Ready (Proxy Method)
+                🟢 Server Status: Checking...
             </div>
         </div>
         
@@ -217,6 +225,12 @@
                     Please allow popups for this website.
                 </div>
 
+                <!-- Test Connection Buttons -->
+                <div class="test-buttons">
+                    <button class="btn" onclick="testServerConnection()" style="background: #17a2b8; color: white;">Test Server Connection</button>
+                    <button class="btn" onclick="testDirectConnection()" style="background: #6f42c1; color: white;">Test Direct Connection</button>
+                </div>
+
                 <!-- Local Key Warning -->
                 <div id="localKeyWarning" class="local-key-warning" style="display: none;">
                     ⚠️ <strong>Local Key Generation Active</strong> - Server connection failed. 
@@ -226,9 +240,9 @@
                 <!-- System ID Input -->
                 <div class="section">
                     <h3>Customer System ID</h3>
-                    <input type="text" id="systemId" placeholder="Enter customer's System ID">
+                    <input type="text" id="systemId" placeholder="Enter customer's System ID (e.g., ABC-123-DEF)">
                     <div style="font-size: 12px; color: #666; margin-top: 5px;">
-                        Example: CUST001, USER123, etc.
+                        💡 Tell your customer to copy System ID from the application
                     </div>
                 </div>
                 
@@ -279,6 +293,9 @@
                     <div id="keyDisplay" class="key-display">
                         Key မထုတ်ရသေးပါ
                     </div>
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                        📋 Give this key to your customer to activate their software
+                    </div>
                 </div>
                 
                 <!-- Action Buttons -->
@@ -302,6 +319,8 @@
     <script>
         const VENDOR_PASSWORD = "VENDOR123";
         const PROXY_URL = "https://dendi2492001.github.io/activation-key-server2/proxy.html";
+        const SERVER_URL = "http://myactivation.infinityfreeapp.com/validate.php";
+        
         let currentKey = "";
         let usedKeys = JSON.parse(localStorage.getItem('usedKeys')) || [];
         let currentProxyWindow = null;
@@ -326,7 +345,7 @@
                 key: keyData.raw_key,
                 systemId: keyData.system_id,
                 duration: keyData.duration,
-                timestamp: new Date().toISOString(),
+                timestamp: new Date().toLocaleString(),
                 expiry: calculateExpiryDate(keyData.duration),
                 formatted_key: keyData.formatted_key
             });
@@ -339,11 +358,6 @@
             localStorage.setItem(LOCAL_KEYS_STORAGE, JSON.stringify(localKeys));
         }
         
-        function isKeyLocallyUsed(key) {
-            const localKeys = getLocalGeneratedKeys();
-            return localKeys.some(k => k.key === key);
-        }
-        
         function checkSecurity() {
             const password = document.getElementById('password').value.trim();
             
@@ -353,6 +367,7 @@
                 updateExpiryInfo();
                 initializeLocalKeys();
                 displayUsedKeys();
+                checkServerStatus();
             } else {
                 alert('❌ Password မှားနေပါတယ်');
             }
@@ -417,7 +432,7 @@
             document.getElementById('localKeyWarning').style.display = 'none';
             
             try {
-                // Open proxy window with ALL parameters - FIXED URL
+                // Open proxy window with ALL parameters
                 const proxyUrl = `${PROXY_URL}?action=generate&systemId=${encodeURIComponent(systemId)}&duration=${encodeURIComponent(duration)}`;
                 console.log('Opening proxy URL:', proxyUrl);
                 
@@ -580,6 +595,68 @@
             }
         }
         
+        // Test server connection
+        async function testServerConnection() {
+            try {
+                document.getElementById('serverStatus').className = 'server-status server-online';
+                document.getElementById('serverStatus').textContent = '🟢 Testing server connection...';
+                
+                const response = await fetch(SERVER_URL, {
+                    method: 'GET',
+                    mode: 'cors'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('serverStatus').innerHTML = `🟢 Server Online: ${data.service} v${data.version}`;
+                    console.log('Server status:', data);
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch (error) {
+                document.getElementById('serverStatus').className = 'server-status server-offline';
+                document.getElementById('serverStatus').textContent = `🔴 Server Offline: ${error.message}`;
+                console.error('Server test failed:', error);
+            }
+        }
+        
+        // Test direct connection
+        async function testDirectConnection() {
+            const systemId = "TEST123";
+            const duration = "1month";
+            
+            try {
+                alert('Testing direct server connection...');
+                
+                const response = await fetch(SERVER_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'generate',
+                        system_id: systemId,
+                        duration: duration,
+                        vendor_password: 'VENDOR123'
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    alert('✅ Direct connection successful!\nServer response: ' + JSON.stringify(result));
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch (error) {
+                alert('❌ Direct connection failed: ' + error.message);
+            }
+        }
+        
+        // Check server status on load
+        function checkServerStatus() {
+            testServerConnection();
+        }
+        
         // Enter key support
         document.getElementById('password').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
@@ -593,23 +670,11 @@
             }
         });
         
-        // Test URL parameters function
-        function testProxyURL() {
-            const systemId = 'TEST123';
-            const duration = '1month';
-            const proxyUrl = `${PROXY_URL}?action=generate&systemId=${encodeURIComponent(systemId)}&duration=${encodeURIComponent(duration)}`;
-            console.log('Test Proxy URL:', proxyUrl);
-            return proxyUrl;
-        }
-        
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             updateExpiryInfo();
             initializeLocalKeys();
             displayUsedKeys();
-            
-            // Test the URL generation
-            console.log('Test URL:', testProxyURL());
         });
     </script>
 </body>
