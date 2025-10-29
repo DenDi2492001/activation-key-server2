@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔑 Activation Key Generator (Vendor Only)</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: #6f42c1;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .section {
+            margin-bottom: 20px;
+        }
+        
+        .license-option {
+            margin: 10px 0;
+        }
+        
+        .info-box {
+            background: #e3f2fd;
+            border: 1px solid #1565c0;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .key-display {
+            background: #2b2b2b;
+            color: #00ff00;
+            font-family: 'Consolas', monospace;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+        }
+        
+        .btn-generate {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-copy {
+            background: #17a2b8;
+            color: white;
+        }
+        
+        .btn-new {
+            background: #ffc107;
+            color: white;
+        }
+        
+        .btn-close {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .action-buttons {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .used-keys {
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 10px;
+        }
+        
+        .server-status {
+            padding: 8px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .server-online {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .server-offline {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Activation Key Generator - Vendor Portal</h1>
+            <div id="serverStatus" class="server-status server-offline">
+                🔴 Checking server status...
+            </div>
+        </div>
+        
+        <div class="content">
+            <!-- Security Check -->
+            <div id="securitySection" class="section">
+                <h3>လုံခြုံရေးစစ်ဆေးခြင်း</h3>
+                <input type="password" id="password" placeholder="Vendor password ထည့်ပါ" style="width: 100%; padding: 10px; margin: 10px 0;">
+                <button class="btn btn-generate" onclick="checkSecurity()">ဝင်ရောက်ရန်</button>
+            </div>
+            
+            <!-- Main Content (Hidden until security check) -->
+            <div id="mainContent" class="section" style="display: none;">
+                <!-- System ID Input -->
+                <div class="section">
+                    <h3>Customer System ID</h3>
+                    <input type="text" id="systemId" placeholder="Enter customer's System ID" style="width: 100%; padding: 10px; margin: 10px 0;">
+                </div>
+                
+                <!-- License Type Selection -->
+                <div class="section">
+                    <h3>လိုင်စင်ကာလရွေးချယ်ရန်</h3>
+                    <div class="license-option">
+                        <input type="radio" id="2days" name="duration" value="2days" checked onchange="updateExpiryInfo()">
+                        <label for="2days">၂ ရက်စမ်းသုံးရန်</label>
+                    </div>
+                    <div class="license-option">
+                        <input type="radio" id="1month" name="duration" value="1month" onchange="updateExpiryInfo()">
+                        <label for="1month">၁ လ လိုင်စင်</label>
+                    </div>
+                    <div class="license-option">
+                        <input type="radio" id="3months" name="duration" value="3months" onchange="updateExpiryInfo()">
+                        <label for="3months">၃ လ လိုင်စင်</label>
+                    </div>
+                    <div class="license-option">
+                        <input type="radio" id="6months" name="duration" value="6months" onchange="updateExpiryInfo()">
+                        <label for="6months">၆ လ လိုင်စင်</label>
+                    </div>
+                    <div class="license-option">
+                        <input type="radio" id="12months" name="duration" value="12months" onchange="updateExpiryInfo()">
+                        <label for="12months">၁၂ လ လိုင်စင်</label>
+                    </div>
+                </div>
+                
+                <!-- Expiry Information -->
+                <div id="expiryInfo" class="info-box">
+                    📅 လိုင်စင်ကုန်ဆုံးမည့်ရက်: <br>
+                    ⏰ ကာလ: 
+                </div>
+                
+                <!-- Loading Indicator -->
+                <div id="loading" class="loading">
+                    <p>🔄 Server နှင့် ချိတ်ဆက်နေသည်...</p>
+                </div>
+                
+                <!-- Generate Button -->
+                <button class="btn btn-generate" onclick="generateKey()" style="width: 100%; padding: 15px;">
+                    Activation Key ထုတ်ရန်
+                </button>
+                
+                <!-- Generated Key Display -->
+                <div class="section">
+                    <h3>ထုတ်လိုက်သော Activation Key</h3>
+                    <div id="keyDisplay" class="key-display">
+                        Key မထုတ်ရသေးပါ
+                    </div>
+                </div>
+                
+                <!-- Used Keys List -->
+                <div class="section used-keys">
+                    <h3>Recently Generated Keys</h3>
+                    <div id="usedKeysList" class="key-display" style="max-height: 150px; overflow-y: auto;">
+                        No keys generated yet
+                    </div>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="action-buttons">
+                    <button class="btn btn-copy" onclick="copyToClipboard()">Clipboard ကိုကူးရန်</button>
+                    <button class="btn btn-new" onclick="generateNewKey()">နောက်ထပ်ထုတ်ရန်</button>
+                    <button class="btn btn-close" onclick="closeGenerator()">ပိတ်ရန်</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const VENDOR_PASSWORD = "VENDOR123";
+        const SERVER_URL = "https://dendi2492001.github.io/activation-key-server/validate.php";
+        let currentKey = "";
+        let usedKeys = JSON.parse(localStorage.getItem('usedKeys')) || [];
+        
+        // Check server status on load
+        checkServerStatus();
+        
+        async function checkServerStatus() {
+            try {
+                const response = await fetch(SERVER_URL);
+                const data = await response.json();
+                document.getElementById('serverStatus').className = 'server-status server-online';
+                document.getElementById('serverStatus').innerHTML = '🟢 Server Online';
+            } catch (error) {
+                document.getElementById('serverStatus').className = 'server-status server-offline';
+                document.getElementById('serverStatus').innerHTML = '🔴 Server Offline - Check Connection';
+            }
+        }
+        
+        function checkSecurity() {
+            const password = document.getElementById('password').value;
+            if (password === VENDOR_PASSWORD) {
+                document.getElementById('securitySection').style.display = 'none';
+                document.getElementById('mainContent').style.display = 'block';
+                updateExpiryInfo();
+                updateUsedKeysList();
+            } else {
+                alert('❌ Password မှားနေပါတယ်');
+            }
+        }
+        
+        function updateExpiryInfo() {
+            const duration = document.querySelector('input[name="duration"]:checked').value;
+            const expiryDate = calculateExpiryDate(duration);
+            const durationText = getDurationDisplay(duration);
+            
+            document.getElementById('expiryInfo').innerHTML = 
+                `📅 လိုင်စင်ကုန်ဆုံးမည့်ရက်: ${expiryDate}<br>⏰ ကာလ: ${durationText}`;
+        }
+        
+        function calculateExpiryDate(duration) {
+            const now = new Date();
+            let expiryDate = new Date();
+            
+            switch(duration) {
+                case '2days':
+                    expiryDate.setDate(now.getDate() + 2);
+                    break;
+                case '1month':
+                    expiryDate.setDate(now.getDate() + 30);
+                    break;
+                case '3months':
+                    expiryDate.setDate(now.getDate() + 90);
+                    break;
+                case '6months':
+                    expiryDate.setDate(now.getDate() + 180);
+                    break;
+                case '12months':
+                    expiryDate.setDate(now.getDate() + 365);
+                    break;
+            }
+            
+            return expiryDate.toISOString().split('T')[0];
+        }
+        
+        function getDurationDisplay(duration) {
+            const durationMap = {
+                "2days": "၂ ရက်",
+                "1month": "၁ လ",
+                "3months": "၃ လ",
+                "6months": "၆ လ", 
+                "12months": "၁၂ လ"
+            };
+            return durationMap[duration] || duration;
+        }
+        
+        async function generateKey() {
+            const systemId = document.getElementById('systemId').value.trim();
+            if (!systemId) {
+                alert('Please enter customer System ID');
+                return;
+            }
+            
+            const duration = document.querySelector('input[name="duration"]:checked').value;
+            
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            
+            try {
+                const response = await fetch(SERVER_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'generate',
+                        system_id: systemId,
+                        duration: duration,
+                        vendor_password: VENDOR_PASSWORD
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    const keyData = result.data;
+                    currentKey = keyData.raw_key;
+                    
+                    // Save to used keys
+                    usedKeys.unshift({
+                        key: keyData.raw_key,
+                        formatted_key: keyData.formatted_key,
+                        systemId: systemId,
+                        duration: duration,
+                        timestamp: new Date().toLocaleString(),
+                        expiry: calculateExpiryDate(duration)
+                    });
+                    
+                    // Keep only last 20 keys
+                    if (usedKeys.length > 20) {
+                        usedKeys = usedKeys.slice(0, 20);
+                    }
+                    
+                    localStorage.setItem('usedKeys', JSON.stringify(usedKeys));
+                    displayKey(keyData, duration, systemId);
+                    updateUsedKeysList();
+                } else {
+                    alert('❌ Key generation failed: ' + result.error);
+                }
+                
+            } catch (error) {
+                alert('❌ Server connection error: ' + error.message);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+        
+        function displayKey(keyData, duration, systemId) {
+            const durationText = getDurationDisplay(duration);
+            
+            const displayText = `System ID: ${systemId}\nလိုင်စင်အမျိုးအစား: ${durationText}\nActivation Key: ${keyData.formatted_key}\nRaw Key: ${keyData.raw_key}`;
+            document.getElementById('keyDisplay').textContent = displayText;
+        }
+        
+        function updateUsedKeysList() {
+            const usedKeysList = document.getElementById('usedKeysList');
+            if (usedKeys.length === 0) {
+                usedKeysList.textContent = 'No keys generated yet';
+                return;
+            }
+            
+            let listText = '';
+            usedKeys.forEach((item, index) => {
+                listText += `${index + 1}. ${item.formatted_key} - ${item.systemId} - ${item.duration} - ${item.timestamp}\n`;
+            });
+            usedKeysList.textContent = listText;
+        }
+        
+        function copyToClipboard() {
+            if (currentKey) {
+                navigator.clipboard.writeText(currentKey).then(() => {
+                    alert('✅ Activation Key ကို clipboard သို့ကူးပြီးပါပြီ');
+                });
+            } else {
+                alert('⚠️ Key မထုတ်ရသေးပါ');
+            }
+        }
+        
+        function generateNewKey() {
+            document.getElementById('systemId').value = '';
+            document.getElementById('keyDisplay').textContent = 'Key မထုတ်ရသေးပါ';
+            currentKey = '';
+        }
+        
+        function closeGenerator() {
+            if (confirm('Key Generator ကိုပိတ်မှာသေချာပါသလား?')) {
+                window.close();
+            }
+        }
+        
+        // Enter key နဲ့ password ရိုက်လို့ရအောင်
+        document.getElementById('password').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                checkSecurity();
+            }
+        });
+        
+        // Initialize
+        updateUsedKeysList();
+    </script>
+</body>
+</html>
