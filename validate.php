@@ -1,5 +1,45 @@
 <?php
-// CORS Headers - Add this at the VERY TOP
+// validate.php - Fixed JSONP Support
+
+// Handle JSONP requests first
+if (isset($_GET['callback'])) {
+    $callback = $_GET['callback'];
+    
+    // Set proper content type for JSONP
+    header('Content-Type: application/javascript; charset=utf-8');
+    
+    // Handle key generation
+    if (isset($_GET['action']) && $_GET['action'] === 'generate') {
+        $system_id = isset($_GET['system_id']) ? trim($_GET['system_id']) : '';
+        $duration = isset($_GET['duration']) ? $_GET['duration'] : '';
+        $vendor_password = isset($_GET['vendor_password']) ? $_GET['vendor_password'] : '';
+        
+        $valid_vendor_password = "VENDOR123";
+        $secret_key = "DENDI_SECURE_KEY_2025_V2";
+        
+        if ($vendor_password === $valid_vendor_password && !empty($system_id) && !empty($duration)) {
+            $result = generateActivationKey($system_id, $duration, $secret_key);
+            $response = array('success' => true, 'data' => $result);
+        } else {
+            $response = array('success' => false, 'error' => 'Invalid parameters or unauthorized');
+        }
+        
+        echo $callback . '(' . json_encode($response) . ');';
+        exit;
+    }
+    
+    // Handle status check
+    $data = array(
+        'status' => 'active', 
+        'service' => 'Activation Key Server', 
+        'version' => '2.0',
+        'timestamp' => date('Y-m-d H:i:s')
+    );
+    echo $callback . '(' . json_encode($data) . ');';
+    exit;
+}
+
+// Regular CORS headers for other requests
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, Accept, Origin');
@@ -160,7 +200,7 @@ function generateActivationKey($system_id, $duration, $secret_key) {
     );
 }
 
-// Main request handling
+// Main request handling for POST requests
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $input = json_decode(file_get_contents('php://input'), true);
     
@@ -200,45 +240,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         echo json_encode(array('valid' => false, 'error' => 'Invalid action or unauthorized'));
     }
     
-} elseif ($_SERVER['REQUEST_METHOD'] == 'GET') {
-    // Handle JSONP callback for GET requests
-    if (isset($_GET['callback'])) {
-        $callback = $_GET['callback'];
-        
-        // Set proper content type for JSONP
-        header('Content-Type: application/javascript; charset=utf-8');
-        
-        // Handle different actions for JSONP
-        if (isset($_GET['action']) && $_GET['action'] === 'generate') {
-            $system_id = isset($_GET['system_id']) ? trim($_GET['system_id']) : '';
-            $duration = isset($_GET['duration']) ? $_GET['duration'] : '';
-            $vendor_password = isset($_GET['vendor_password']) ? $_GET['vendor_password'] : '';
-            
-            $valid_vendor_password = "VENDOR123";
-            
-            if ($vendor_password === $valid_vendor_password && !empty($system_id) && !empty($duration)) {
-                $result = generateActivationKey($system_id, $duration, $secret_key);
-                $response = array('success' => true, 'data' => $result);
-            } else {
-                $response = array('success' => false, 'error' => 'Invalid parameters or unauthorized');
-            }
-            
-            echo $callback . '(' . json_encode($response) . ');';
-            exit;
-        }
-        
-        // Default status check for JSONP
-        $data = array(
-            'status' => 'active', 
-            'service' => 'Activation Key Server', 
-            'version' => '2.0',
-            'used_keys_count' => count(loadUsedKeys()),
-            'timestamp' => date('Y-m-d H:i:s')
-        );
-        echo $callback . '(' . json_encode($data) . ');';
-        exit;
-    }
-    
+} elseif ($_SERVER['REQUEST_METHOD'] == 'GET' && !isset($_GET['callback'])) {
     // Simple status check for regular GET
     echo json_encode(array(
         'status' => 'active', 
@@ -247,7 +249,5 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         'used_keys_count' => count(loadUsedKeys()),
         'timestamp' => date('Y-m-d H:i:s')
     ));
-} else {
-    echo json_encode(array('valid' => false, 'error' => 'Only POST and GET requests allowed'));
 }
 ?>
