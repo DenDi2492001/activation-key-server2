@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Server Connection - Activation Key System</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: white;
+        }
+        .container {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        .loading-spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid white;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        h2 {
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+        p {
+            margin: 5px 0;
+            opacity: 0.9;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="loading-spinner"></div>
+        <h2>🔗 Connecting to Server</h2>
+        <p>Please wait while we process your request...</p>
+        <div class="status" id="status">Initializing connection...</div>
+    </div>
+
+    <script>
+        // Get parameters from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const action = urlParams.get('action') || 'generate';
+        const systemId = urlParams.get('systemId') || '';
+        const duration = urlParams.get('duration') || '2days';
+
+        // Update status
+        function updateStatus(message) {
+            document.getElementById('status').textContent = message;
+            console.log('Proxy:', message);
+        }
+
+        // Make request to PHP server
+        async function connectToServer() {
+            try {
+                updateStatus('Preparing request...');
+                
+                const payload = {
+                    action: action,
+                    system_id: systemId,
+                    duration: duration,
+                    vendor_password: 'VENDOR123'
+                };
+
+                updateStatus('Sending request to server...');
+                
+                const response = await fetch('http://myactivation.infinityfreeapp.com/validate.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                updateStatus('Processing server response...');
+
+                if (!response.ok) {
+                    throw new Error(`Server returned error: ${response.status} ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                
+                updateStatus('Request completed successfully!');
+
+                // Send result back to opener
+                if (window.opener && !window.opener.closed) {
+                    window.opener.postMessage({
+                        type: 'PROXY_RESULT',
+                        data: data,
+                        timestamp: new Date().toISOString()
+                    }, '*');
+                }
+
+                // Close after short delay
+                setTimeout(() => {
+                    updateStatus('Closing connection...');
+                    window.close();
+                }, 1000);
+
+            } catch (error) {
+                console.error('Proxy Error:', error);
+                updateStatus(`Error: ${error.message}`);
+                
+                // Send error back to opener
+                if (window.opener && !window.opener.closed) {
+                    window.opener.postMessage({
+                        type: 'PROXY_ERROR',
+                        error: error.message,
+                        timestamp: new Date().toISOString()
+                    }, '*');
+                }
+
+                // Close after error display
+                setTimeout(() => {
+                    window.close();
+                }, 3000);
+            }
+        }
+
+        // Start connection when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            updateStatus('Starting server connection...');
+            setTimeout(connectToServer, 1000);
+        });
+
+        // Close if no activity after 30 seconds
+        setTimeout(() => {
+            if (!window.closed) {
+                updateStatus('Connection timeout - closing window');
+                window.close();
+            }
+        }, 30000);
+    </script>
+</body>
+</html>
