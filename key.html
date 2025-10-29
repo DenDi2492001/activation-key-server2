@@ -335,7 +335,7 @@
                 <div class="section">
                     <div class="section-title">📅 License Duration</div>
                     <div class="license-options">
-                        <label class="license-option" onclick="selectDuration('2days')">
+                        <label class="license-option selected" onclick="selectDuration('2days')">
                             <input type="radio" name="duration" value="2days" checked> 
                             <span>2 Days Trial</span>
                         </label>
@@ -496,7 +496,7 @@
                 // Try JSONP method first
                 const result = await generateWithJSONP(systemId, currentDuration);
                 
-                if (result.success) {
+                if (result && result.success) {
                     handleSuccess(result.data, systemId, "JSONP");
                 } else {
                     // Fallback to local generation
@@ -511,33 +511,58 @@
             }
         }
         
-        // JSONP Key Generation
+        // JSONP Key Generation - FIXED VERSION
         function generateWithJSONP(systemId, duration) {
             return new Promise((resolve) => {
-                const callbackName = 'jsonpCallback_' + Date.now();
+                const callbackName = 'jsonpCallback_' + Math.random().toString(36).substr(2, 9);
+                
+                // Create the script element
                 const script = document.createElement('script');
                 
-                const url = `${SERVER_URL}?callback=${callbackName}&action=generate&system_id=${systemId}&duration=${duration}&vendor_password=VENDOR123&_=${Date.now()}`;
-                script.src = url;
+                // Build the URL with parameters
+                const params = new URLSearchParams({
+                    callback: callbackName,
+                    action: 'generate',
+                    system_id: systemId,
+                    duration: duration,
+                    vendor_password: VENDOR123,
+                    _: Date.now()
+                });
                 
+                script.src = SERVER_URL + '?' + params.toString();
+                
+                // Set up the callback function
                 window[callbackName] = function(response) {
-                    document.head.removeChild(script);
+                    // Clean up
+                    if (script.parentNode) {
+                        script.parentNode.removeChild(script);
+                    }
                     delete window[callbackName];
+                    
+                    // Resolve the promise with the response
                     resolve(response);
                 };
                 
+                // Handle script load errors
                 script.onerror = function() {
-                    document.head.removeChild(script);
+                    // Clean up
+                    if (script.parentNode) {
+                        script.parentNode.removeChild(script);
+                    }
                     delete window[callbackName];
-                    resolve({ success: false, error: 'JSONP failed' });
+                    
+                    resolve({ success: false, error: 'Script load failed' });
                 };
                 
+                // Add script to document
                 document.head.appendChild(script);
                 
-                // Timeout after 10 seconds
+                // Set timeout for cleanup
                 setTimeout(() => {
                     if (window[callbackName]) {
-                        document.head.removeChild(script);
+                        if (script.parentNode) {
+                            script.parentNode.removeChild(script);
+                        }
                         delete window[callbackName];
                         resolve({ success: false, error: 'Timeout' });
                     }
@@ -573,21 +598,22 @@ Status: ⚠️ LOCAL GENERATION (Server Unavailable)`;
             };
             
             const durationCode = durationMap[duration] || 'T';
-            const random = Math.random().toString(36).substring(2, 15);
-            const timestamp = Date.now().toString();
             
-            // Create a simple hash
+            // Create a more secure hash using system_id and duration
+            const baseString = systemId + 'DENDI_SECURE_KEY_2025_V2' + durationCode + Date.now();
             let hash = '';
-            const baseString = systemId + 'DENDI_SECURE' + durationCode + timestamp + random;
             
+            // Simple hash function
             for (let i = 0; i < baseString.length; i++) {
-                const code = baseString.charCodeAt(i);
-                hash += ((code * (i + 1)) % 36).toString(36);
+                const charCode = baseString.charCodeAt(i);
+                hash += ((charCode * (i + 1)) % 36).toString(36);
             }
             
+            // Take first 15 characters and make uppercase
             hash = hash.substring(0, 15).toUpperCase().replace(/[^A-Z0-9]/g, '0');
             const rawKey = durationCode + hash;
             
+            // Format with dashes
             const formattedKey = 
                 rawKey.substring(0, 4) + '-' +
                 rawKey.substring(4, 8) + '-' +
@@ -629,7 +655,7 @@ Status: ✅ SERVER GENERATION (${method})`;
             try {
                 const result = await generateWithJSONP('TEST123', '1month');
                 
-                if (result.success) {
+                if (result && result.success) {
                     showAlert('✅ Connection test successful!', 'success');
                     document.getElementById('serverStatus').className = 'server-status server-online';
                     document.getElementById('serverStatus').textContent = '🟢 Server Online';
@@ -649,7 +675,7 @@ Status: ✅ SERVER GENERATION (${method})`;
         
         // Check server status
         function checkServerStatus() {
-            const callbackName = 'statusCallback_' + Date.now();
+            const callbackName = 'statusCallback_' + Math.random().toString(36).substr(2, 9);
             const script = document.createElement('script');
             
             script.src = `${SERVER_URL}?callback=${callbackName}&_=${Date.now()}`;
@@ -657,14 +683,18 @@ Status: ✅ SERVER GENERATION (${method})`;
             window[callbackName] = function(data) {
                 document.getElementById('serverStatus').className = 'server-status server-online';
                 document.getElementById('serverStatus').textContent = `🟢 ${data.service} v${data.version}`;
-                document.head.removeChild(script);
+                if (script.parentNode) {
+                    script.parentNode.removeChild(script);
+                }
                 delete window[callbackName];
             };
 
             script.onerror = function() {
                 document.getElementById('serverStatus').className = 'server-status server-offline';
                 document.getElementById('serverStatus').textContent = '🔴 Server Offline';
-                document.head.removeChild(script);
+                if (script.parentNode) {
+                    script.parentNode.removeChild(script);
+                }
                 delete window[callbackName];
             };
 
