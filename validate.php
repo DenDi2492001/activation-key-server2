@@ -11,12 +11,73 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
 
 // Configuration - CHANGE THIS SECRET KEY!
 $secret_key = "DENDI_SECURE_KEY_2025_V2";
+$used_keys_file = "used_keys.json";
+$activation_logs = "activation_logs.json";
+
+// Used keys tracking functions
+function loadUsedKeys() {
+    global $used_keys_file;
+    if (!file_exists($used_keys_file)) {
+        return [];
+    }
+    $data = file_get_contents($used_keys_file);
+    return json_decode($data, true) ?: [];
+}
+
+function saveUsedKeys($used_keys) {
+    global $used_keys_file;
+    file_put_contents($used_keys_file, json_encode($used_keys));
+}
+
+function isKeyUsed($activation_key) {
+    $used_keys = loadUsedKeys();
+    return in_array($activation_key, $used_keys);
+}
+
+function markKeyAsUsed($activation_key) {
+    $used_keys = loadUsedKeys();
+    if (!in_array($activation_key, $used_keys)) {
+        $used_keys[] = $activation_key;
+        saveUsedKeys($used_keys);
+    }
+}
+
+// Activation logging
+function logActivation($system_id, $activation_key, $duration, $ip) {
+    global $activation_logs;
+    $logs = [];
+    
+    if (file_exists($activation_logs)) {
+        $logs = json_decode(file_get_contents($activation_logs), true) ?: [];
+    }
+    
+    $log_entry = [
+        'timestamp' => date('Y-m-d H:i:s'),
+        'system_id' => $system_id,
+        'activation_key' => $activation_key,
+        'duration' => $duration,
+        'ip_address' => $ip
+    ];
+    
+    array_unshift($logs, $log_entry);
+    
+    // Keep only last 1000 logs
+    if (count($logs) > 1000) {
+        $logs = array_slice($logs, 0, 1000);
+    }
+    
+    file_put_contents($activation_logs, json_encode($logs));
+}
 
 // Validate activation key
 function validateActivationKey($system_id, $activation_key, $secret_key) {
-    // Remove any dashes from key
     $activation_key = str_replace('-', '', $activation_key);
     $activation_key = strtoupper($activation_key);
+    
+    // Check if key is already used
+    if (isKeyUsed($activation_key)) {
+        return array('valid' => false, 'error' => 'This activation key has already been used');
+    }
     
     // Validate key length
     if (strlen($activation_key) != 16) {
@@ -59,6 +120,10 @@ function validateActivationKey($system_id, $activation_key, $secret_key) {
         );
         
         $duration = isset($duration_map[$duration_code]) ? $duration_map[$duration_code] : '2days';
+        
+        // Mark key as used and log activation
+        markKeyAsUsed($activation_key);
+        logActivation($system_id, $activation_key, $duration, $_SERVER['REMOTE_ADDR']);
         
         return array(
             'valid' => true,
@@ -144,7 +209,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
 } elseif ($_SERVER['REQUEST_METHOD'] == 'GET') {
     // Simple status check
-    echo json_encode(array('status' => 'active', 'service' => 'Activation Key Server', 'version' => '2.0'));
+    echo json_encode(array(
+        'status' => 'active', 
+        'service' => 'Activation Key Server', 
+        'version' => '2.0',
+        'used_keys_count' => count(loadUsedKeys()),
+        'timestamp' => date('Y-m-d H:i:s')
+    ));
 } else {
     echo json_encode(array('valid' => false, 'error' => 'Only POST and GET requests allowed'));
 }
