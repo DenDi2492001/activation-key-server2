@@ -134,27 +134,35 @@
             border-radius: 5px;
             font-size: 16px;
         }
+        
+        .security-section {
+            display: block;
+        }
+        
+        .main-content {
+            display: none;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>Activation Key Generator - Vendor Portal</h1>
-            <div id="serverStatus" class="server-status server-online">
-                🟢 Server Online
+            <div id="serverStatus" class="server-status">
+                🔄 Checking server status...
             </div>
         </div>
         
         <div class="content">
             <!-- Security Check -->
-            <div id="securitySection" class="section">
+            <div id="securitySection" class="section security-section">
                 <h3>လုံခြုံရေးစစ်ဆေးခြင်း</h3>
                 <input type="password" id="password" placeholder="Vendor password ထည့်ပါ">
                 <button class="btn btn-generate" onclick="checkSecurity()">ဝင်ရောက်ရန်</button>
             </div>
             
             <!-- Main Content (Hidden until security check) -->
-            <div id="mainContent" class="section" style="display: none;">
+            <div id="mainContent" class="section main-content">
                 <!-- System ID Input -->
                 <div class="section">
                     <h3>Customer System ID</h3>
@@ -226,16 +234,52 @@
         let currentKey = "";
         let usedKeys = JSON.parse(localStorage.getItem('usedKeys')) || [];
         
+        // Real server status check
+        async function checkServerStatus() {
+            try {
+                const response = await fetch(SERVER_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        action: 'validate',
+                        system_id: 'status_check',
+                        activation_key: 'STATUSCHECK123456'
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('serverStatus').className = 'server-status server-online';
+                    document.getElementById('serverStatus').innerHTML = '🟢 Server Online';
+                    return true;
+                } else {
+                    document.getElementById('serverStatus').className = 'server-status server-offline';
+                    document.getElementById('serverStatus').innerHTML = '🔴 Server Offline';
+                    return false;
+                }
+            } catch (error) {
+                console.log('Server status check failed:', error);
+                document.getElementById('serverStatus').className = 'server-status server-offline';
+                document.getElementById('serverStatus').innerHTML = '🔴 Server Offline - Check Connection';
+                return false;
+            }
+        }
+        
+        // Security check function
         function checkSecurity() {
-            const password = document.getElementById('password').value;
+            const password = document.getElementById('password').value.trim();
             
             if (password === VENDOR_PASSWORD) {
                 document.getElementById('securitySection').style.display = 'none';
                 document.getElementById('mainContent').style.display = 'block';
                 updateExpiryInfo();
-                updateUsedKeysList();
             } else {
                 alert('❌ Password မှားနေပါတယ်');
+                document.getElementById('password').value = '';
+                document.getElementById('password').focus();
             }
         }
         
@@ -257,16 +301,16 @@
                     expiryDate.setDate(now.getDate() + 2);
                     break;
                 case '1month':
-                    expiryDate.setDate(now.getDate() + 30);
+                    expiryDate.setMonth(now.getMonth() + 1);
                     break;
                 case '3months':
-                    expiryDate.setDate(now.getDate() + 90);
+                    expiryDate.setMonth(now.getMonth() + 3);
                     break;
                 case '6months':
-                    expiryDate.setDate(now.getDate() + 180);
+                    expiryDate.setMonth(now.getMonth() + 6);
                     break;
                 case '12months':
-                    expiryDate.setDate(now.getDate() + 365);
+                    expiryDate.setFullYear(now.getFullYear() + 1);
                     break;
             }
             
@@ -291,6 +335,13 @@
                 return;
             }
             
+            // Check server status first
+            const isOnline = await checkServerStatus();
+            if (!isOnline) {
+                alert('❌ Server is offline. Please check your internet connection and try again.');
+                return;
+            }
+            
             const duration = document.querySelector('input[name="duration"]:checked').value;
             
             // Show loading
@@ -301,6 +352,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                    'Accept': 'application/json'
                     },
                     body: JSON.stringify({
                         action: 'generate',
@@ -309,6 +361,10 @@
                         vendor_password: VENDOR_PASSWORD
                     })
                 });
+                
+                if (!response.ok) {
+                    throw new Error(`Server returned ${response.status}`);
+                }
                 
                 const result = await response.json();
                 
@@ -333,12 +389,12 @@
                     
                     localStorage.setItem('usedKeys', JSON.stringify(usedKeys));
                     displayKey(keyData, duration, systemId);
-                    updateUsedKeysList();
                 } else {
-                    alert('❌ Key generation failed: ' + result.error);
+                    alert('❌ Key generation failed: ' + (result.error || 'Unknown error'));
                 }
                 
             } catch (error) {
+                console.error('Key generation error:', error);
                 alert('❌ Server connection error: ' + error.message);
             } finally {
                 document.getElementById('loading').style.display = 'none';
@@ -352,14 +408,12 @@
             document.getElementById('keyDisplay').textContent = displayText;
         }
         
-        function updateUsedKeysList() {
-            // Optional: Display recent keys
-        }
-        
         function copyToClipboard() {
             if (currentKey) {
                 navigator.clipboard.writeText(currentKey).then(() => {
                     alert('✅ Activation Key ကို clipboard သို့ကူးပြီးပါပြီ');
+                }).catch(err => {
+                    alert('❌ Clipboard ကူးရာမှာအမှားဖြစ်နေပါတယ်');
                 });
             } else {
                 alert('⚠️ Key မထုတ်ရသေးပါ');
@@ -378,15 +432,25 @@
             }
         }
         
-        // Enter key support
+        // Enter key support for password
         document.getElementById('password').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 checkSecurity();
             }
         });
         
-        // Initialize
-        updateExpiryInfo();
+        // Enter key support for system ID
+        document.getElementById('systemId').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                generateKey();
+            }
+        });
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            checkServerStatus();
+            updateExpiryInfo();
+        });
     </script>
 </body>
 </html>
