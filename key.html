@@ -459,13 +459,6 @@
             document.getElementById('successMessage').style.display = 'none';
             document.getElementById('connectionMethod').textContent = "Testing connection methods...";
             
-            const payload = {
-                action: 'generate',
-                system_id: systemId,
-                duration: duration,
-                vendor_password: 'VENDOR123'
-            };
-
             // Method 1: Try JSONP first (no CORS issues)
             document.getElementById('loadingText').textContent = "🔄 Trying JSONP method...";
             try {
@@ -478,22 +471,10 @@
                 console.log('JSONP failed:', error);
             }
 
-            // Method 2: Try CORS proxy
-            document.getElementById('loadingText').textContent = "🔄 Trying CORS proxy...";
-            try {
-                const proxyResult = await corsProxyKeyGeneration(payload);
-                if (proxyResult.success) {
-                    handleSuccess(proxyResult.data, systemId, duration, "CORS Proxy");
-                    return;
-                }
-            } catch (error) {
-                console.log('CORS proxy failed:', error);
-            }
-
-            // Method 3: Try direct fetch with no-cors
+            // Method 2: Try direct fetch with mode 'no-cors'
             document.getElementById('loadingText').textContent = "🔄 Trying direct fetch...";
             try {
-                const directResult = await directFetchKeyGeneration(payload);
+                const directResult = await directFetchKeyGeneration(systemId, duration);
                 if (directResult.success) {
                     handleSuccess(directResult.data, systemId, duration, "Direct Fetch");
                     return;
@@ -502,10 +483,10 @@
                 console.log('Direct fetch failed:', error);
             }
 
-            // Method 4: Try form submission
+            // Method 3: Try form submission
             document.getElementById('loadingText').textContent = "🔄 Trying form submission...";
             try {
-                const formResult = await formSubmissionKeyGeneration(payload);
+                const formResult = await formSubmissionKeyGeneration(systemId, duration);
                 if (formResult.success) {
                     handleSuccess(formResult.data, systemId, duration, "Form Submission");
                     return;
@@ -519,7 +500,7 @@
             await generateLocalKeyFallback(systemId, duration);
         }
         
-        // Method 1: JSONP Key Generation
+        // Method 1: JSONP Key Generation (Improved)
         function jsonpKeyGeneration(systemId, duration) {
             return new Promise((resolve) => {
                 const callbackName = 'keyGenCallback_' + Date.now();
@@ -531,7 +512,8 @@
                     system_id: systemId,
                     duration: duration,
                     vendor_password: 'VENDOR123',
-                    callback: callbackName
+                    callback: callbackName,
+                    _: Date.now() // Prevent caching
                 });
                 
                 script.src = SERVER_URL + '?' + params.toString();
@@ -540,7 +522,7 @@
                     document.head.removeChild(script);
                     delete window[callbackName];
                     
-                    if (data.success) {
+                    if (data && data.success) {
                         resolve({ success: true, data: data.data });
                     } else {
                         resolve({ success: false });
@@ -566,52 +548,21 @@
             });
         }
         
-        // Method 2: CORS Proxy
-        async function corsProxyKeyGeneration(payload) {
-            const proxies = [
-                'https://api.allorigins.win/raw?url=',
-                'https://cors-anywhere.herokuapp.com/',
-                'https://api.codetabs.com/v1/proxy?quest='
-            ];
-            
-            for (const proxy of proxies) {
-                try {
-                    const proxyUrl = proxy + encodeURIComponent(SERVER_URL);
-                    const response = await fetch(proxyUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(payload),
-                        timeout: 10000
-                    });
-                    
-                    if (response.ok) {
-                        const result = await response.json();
-                        if (result.success) {
-                            return { success: true, data: result.data };
-                        }
-                    }
-                } catch (error) {
-                    continue;
-                }
-            }
-            
-            return { success: false };
-        }
-        
-        // Method 3: Direct Fetch
-        async function directFetchKeyGeneration(payload) {
+        // Method 2: Direct Fetch with no-cors mode
+        async function directFetchKeyGeneration(systemId, duration) {
             try {
+                // First try with CORS
                 const response = await fetch(SERVER_URL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                    'Accept': 'application/json'
                     },
-                    body: JSON.stringify(payload),
-                    mode: 'cors',
-                    credentials: 'omit'
+                    body: JSON.stringify({
+                        action: 'generate',
+                        system_id: systemId,
+                        duration: duration,
+                        vendor_password: 'VENDOR123'
+                    })
                 });
                 
                 if (response.ok) {
@@ -621,22 +572,46 @@
                     }
                 }
             } catch (error) {
-                // Ignore error
+                // If CORS fails, try with no-cors mode (but we can't read response)
+                try {
+                    await fetch(SERVER_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        body: JSON.stringify({
+                            action: 'generate',
+                            system_id: systemId,
+                            duration: duration,
+                            vendor_password: 'VENDOR123'
+                        })
+                    });
+                    // If we get here, the request was sent but we can't read response
+                    // So we'll consider this a partial success and use local generation
+                } catch (noCorsError) {
+                    // Ignore no-cors error
+                }
             }
             
             return { success: false };
         }
         
-        // Method 4: Form Submission
-        function formSubmissionKeyGeneration(payload) {
+        // Method 3: Form Submission
+        function formSubmissionKeyGeneration(systemId, duration) {
             return new Promise((resolve) => {
                 const form = document.createElement('form');
                 form.method = 'POST';
                 form.action = SERVER_URL;
+                form.target = '_blank';
                 form.style.display = 'none';
                 
                 // Add all payload fields as hidden inputs
-                for (const [key, value] of Object.entries(payload)) {
+                const fields = {
+                    action: 'generate',
+                    system_id: systemId,
+                    duration: duration,
+                    vendor_password: 'VENDOR123'
+                };
+                
+                for (const [key, value] of Object.entries(fields)) {
                     const input = document.createElement('input');
                     input.type = 'hidden';
                     input.name = key;
@@ -650,7 +625,7 @@
                 setTimeout(() => {
                     document.body.removeChild(form);
                     resolve({ success: false });
-                }, 5000);
+                }, 3000);
                 
                 form.submit();
             });
@@ -786,15 +761,14 @@
         
         // Test all connection methods
         async function testAllConnections() {
-            alert('Testing all connection methods...\n\nThis will test:\n1. JSONP Method\n2. CORS Proxy\n3. Direct Fetch\n4. Form Submission');
+            alert('Testing all connection methods...\n\nThis will test:\n1. JSONP Method\n2. Direct Fetch\n3. Form Submission');
             
             document.getElementById('serverStatus').textContent = '🔄 Testing all methods...';
             
             // Test each method
             const methods = [
                 { name: 'JSONP', test: () => jsonpKeyGeneration('TEST123', '1month') },
-                { name: 'CORS Proxy', test: () => corsProxyKeyGeneration({action: 'generate', system_id: 'TEST123', duration: '1month', vendor_password: 'VENDOR123'}) },
-                { name: 'Direct Fetch', test: () => directFetchKeyGeneration({action: 'generate', system_id: 'TEST123', duration: '1month', vendor_password: 'VENDOR123'}) }
+                { name: 'Direct Fetch', test: () => directFetchKeyGeneration('TEST123', '1month') }
             ];
             
             let workingMethods = [];
@@ -893,7 +867,7 @@
             const callbackName = 'statusCallback_' + Date.now();
             const script = document.createElement('script');
             
-            script.src = SERVER_URL + '?callback=' + callbackName;
+            script.src = SERVER_URL + '?callback=' + callbackName + '&_=' + Date.now();
             
             window[callbackName] = function(data) {
                 document.getElementById('serverStatus').className = 'server-status server-online';
