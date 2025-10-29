@@ -98,6 +98,10 @@
             margin-top: 20px;
             max-height: 200px;
             overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            background: #f8f9fa;
         }
         
         .loading {
@@ -163,6 +167,30 @@
             font-size: 14px;
             color: #856404;
         }
+
+        .used-key-item {
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 4px;
+            border-left: 4px solid #007acc;
+            background: white;
+        }
+
+        .used-key-item.local {
+            border-left-color: #dc3545;
+            background: #f8f9fa;
+        }
+
+        .key-info {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .key-value {
+            font-family: 'Consolas', monospace;
+            font-weight: bold;
+            color: #333;
+        }
     </style>
 </head>
 <body>
@@ -199,6 +227,9 @@
                 <div class="section">
                     <h3>Customer System ID</h3>
                     <input type="text" id="systemId" placeholder="Enter customer's System ID">
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                        Example: CUST001, USER123, etc.
+                    </div>
                 </div>
                 
                 <!-- License Type Selection -->
@@ -296,7 +327,8 @@
                 systemId: keyData.system_id,
                 duration: keyData.duration,
                 timestamp: new Date().toISOString(),
-                expiry: calculateExpiryDate(keyData.duration)
+                expiry: calculateExpiryDate(keyData.duration),
+                formatted_key: keyData.formatted_key
             });
             
             // Keep only last 50 local keys
@@ -385,7 +417,7 @@
             document.getElementById('localKeyWarning').style.display = 'none';
             
             try {
-                // Open proxy window with ALL parameters
+                // Open proxy window with ALL parameters - FIXED URL
                 const proxyUrl = `${PROXY_URL}?action=generate&systemId=${encodeURIComponent(systemId)}&duration=${encodeURIComponent(duration)}`;
                 console.log('Opening proxy URL:', proxyUrl);
                 
@@ -407,7 +439,7 @@
                             currentKey = keyData.raw_key;
                             
                             // Save to used keys
-                            usedKeys.unshift({
+                            const keyRecord = {
                                 key: keyData.raw_key,
                                 formatted_key: keyData.formatted_key,
                                 systemId: systemId,
@@ -415,9 +447,11 @@
                                 timestamp: new Date().toLocaleString(),
                                 expiry: calculateExpiryDate(duration),
                                 local_generated: keyData.local_generated || false
-                            });
+                            };
                             
-                            // If locally generated, track it
+                            usedKeys.unshift(keyRecord);
+                            
+                            // If locally generated, track it separately
                             if (keyData.local_generated) {
                                 saveLocalGeneratedKey(keyData);
                                 document.getElementById('localKeyWarning').style.display = 'block';
@@ -487,22 +521,29 @@
             const allKeys = [...usedKeys];
             
             if (allKeys.length === 0) {
-                usedKeysList.innerHTML = '<p>No keys generated yet</p>';
+                usedKeysList.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">No keys generated yet</p>';
                 return;
             }
             
-            let html = '<div style="font-size: 12px; line-height: 1.4;">';
-            allKeys.slice(0, 10).forEach(key => {
-                const localIndicator = key.local_generated ? '🔸 ' : '🔹 ';
+            let html = '';
+            allKeys.slice(0, 10).forEach((key, index) => {
+                const isLocal = key.local_generated;
+                const itemClass = isLocal ? 'used-key-item local' : 'used-key-item';
+                const icon = isLocal ? '🔸' : '🔹';
+                const typeText = isLocal ? ' (Local)' : ' (Server)';
+                
                 html += `
-                    <div style="margin-bottom: 8px; padding: 5px; background: #f8f9fa; border-radius: 3px;">
-                        ${localIndicator}<strong>${key.systemId}</strong><br>
-                        Key: ${key.formatted_key}<br>
-                        Duration: ${getDurationDisplay(key.duration)} | ${key.timestamp}
+                    <div class="${itemClass}">
+                        <div class="key-info">
+                            ${icon} <strong>${key.systemId}</strong>${typeText}
+                        </div>
+                        <div class="key-value">${key.formatted_key}</div>
+                        <div class="key-info">
+                            ${getDurationDisplay(key.duration)} | ${key.timestamp}
+                        </div>
                     </div>
                 `;
             });
-            html += '</div>';
             
             usedKeysList.innerHTML = html;
         }
@@ -512,7 +553,14 @@
                 navigator.clipboard.writeText(currentKey).then(() => {
                     alert('✅ Activation Key copied to clipboard!');
                 }).catch(err => {
-                    alert('❌ Failed to copy to clipboard');
+                    // Fallback for older browsers
+                    const textArea = document.createElement('textarea');
+                    textArea.value = currentKey;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    alert('✅ Activation Key copied to clipboard!');
                 });
             } else {
                 alert('⚠️ No key generated yet');
@@ -545,10 +593,23 @@
             }
         });
         
+        // Test URL parameters function
+        function testProxyURL() {
+            const systemId = 'TEST123';
+            const duration = '1month';
+            const proxyUrl = `${PROXY_URL}?action=generate&systemId=${encodeURIComponent(systemId)}&duration=${encodeURIComponent(duration)}`;
+            console.log('Test Proxy URL:', proxyUrl);
+            return proxyUrl;
+        }
+        
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             updateExpiryInfo();
             initializeLocalKeys();
+            displayUsedKeys();
+            
+            // Test the URL generation
+            console.log('Test URL:', testProxyURL());
         });
     </script>
 </body>
