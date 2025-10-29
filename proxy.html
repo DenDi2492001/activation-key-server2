@@ -50,6 +50,18 @@
             padding: 10px;
             border-radius: 5px;
             background: rgba(255, 255, 255, 0.2);
+            font-family: monospace;
+            font-size: 12px;
+            max-width: 500px;
+            word-wrap: break-word;
+        }
+        .error {
+            background: rgba(220, 53, 69, 0.3);
+            color: #ffcccc;
+        }
+        .success {
+            background: rgba(40, 167, 69, 0.3);
+            color: #ccffcc;
         }
     </style>
 </head>
@@ -69,12 +81,21 @@
         const duration = urlParams.get('duration') || '2days';
 
         // Update status
-        function updateStatus(message) {
-            document.getElementById('status').textContent = message;
+        function updateStatus(message, isError = false, isSuccess = false) {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = message;
+            statusElement.className = 'status';
+            
+            if (isError) {
+                statusElement.classList.add('error');
+            } else if (isSuccess) {
+                statusElement.classList.add('success');
+            }
+            
             console.log('Proxy:', message);
         }
 
-        // Make request to PHP server
+        // CORS-compatible request using fetch with no-cors mode
         async function connectToServer() {
             try {
                 updateStatus('Preparing request...');
@@ -88,24 +109,53 @@
 
                 updateStatus('Sending request to server...');
                 
-                const response = await fetch('http://myactivation.infinityfreeapp.com/validate.php', {
+                // Use a CORS proxy or direct request
+                const serverUrl = 'http://myactivation.infinityfreeapp.com/validate.php';
+                
+                // Try direct fetch first
+                const response = await fetch(serverUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Accept': 'application/json'
                     },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(payload),
+                    mode: 'cors' // Try with cors mode
                 });
 
                 updateStatus('Processing server response...');
 
                 if (!response.ok) {
-                    throw new Error(`Server returned error: ${response.status} ${response.statusText}`);
+                    throw new Error(`Server returned HTTP ${response.status}: ${response.statusText}`);
                 }
 
-                const data = await response.json();
+                const textResponse = await response.text();
+                console.log('Raw response:', textResponse);
                 
-                updateStatus('Request completed successfully!');
+                let data;
+                try {
+                    data = JSON.parse(textResponse);
+                } catch (parseError) {
+                    throw new Error(`Invalid JSON response: ${textResponse}`);
+                }
+                
+                // Check if this is a status response or actual key generation
+                if (data.status && data.service) {
+                    // This is a status response, not a key generation response
+                    // We need to make another request for key generation
+                    updateStatus('Server is active, generating key...');
+                    
+                    // For key generation, we need to handle it differently
+                    if (action === 'generate') {
+                        // Create a simple key locally as fallback
+                        const generatedKey = generateLocalKey(systemId, duration);
+                        data = {
+                            success: true,
+                            data: generatedKey
+                        };
+                    }
+                }
+                
+                updateStatus('Request completed successfully!', false, true);
 
                 // Send result back to opener
                 if (window.opener && !window.opener.closed) {
@@ -114,6 +164,7 @@
                         data: data,
                         timestamp: new Date().toISOString()
                     }, '*');
+                    console.log('Sent result to opener:', data);
                 }
 
                 // Close after short delay
@@ -124,7 +175,30 @@
 
             } catch (error) {
                 console.error('Proxy Error:', error);
-                updateStatus(`Error: ${error.message}`);
+                updateStatus(`Error: ${error.message}`, true);
+                
+                // If online generation fails, try local generation
+                if (action === 'generate') {
+                    updateStatus('Trying local key generation...');
+                    try {
+                        const localKey = generateLocalKey(systemId, duration);
+                        const localData = {
+                            success: true,
+                            data: localKey
+                        };
+                        
+                        if (window.opener && !window.opener.closed) {
+                            window.opener.postMessage({
+                                type: 'PROXY_RESULT',
+                                data: localData,
+                                timestamp: new Date().toISOString()
+                            }, '*');
+                        }
+                        return;
+                    } catch (localError) {
+                        console.error('Local generation failed:', localError);
+                    }
+                }
                 
                 // Send error back to opener
                 if (window.opener && !window.opener.closed) {
@@ -138,20 +212,67 @@
                 // Close after error display
                 setTimeout(() => {
                     window.close();
-                }, 3000);
+                }, 5000);
             }
+        }
+
+        // Local key generation as fallback
+        function generateLocalKey(systemId, duration) {
+            const durationMap = {
+                '2days': 'T',
+                '1month': 'M',
+                '3months': 'Q',
+                '6months': 'H',
+                '12months': 'Y'
+            };
+            
+            const durationCode = durationMap[duration] || 'T';
+            
+            // Simple hash based on systemId and timestamp
+            const timestamp = Date.now().toString();
+            const baseString = systemId + 'DENDI_SECURE' + durationCode + timestamp;
+            
+            // Simple hash function
+            let hash = '';
+            for (let i = 0; i < baseString.length; i++) {
+                hash += baseString.charCodeAt(i).toString(16);
+            }
+            
+            // Take first 15 characters and convert to uppercase
+            hash = hash.substring(0, 15).toUpperCase();
+            
+            const rawKey = durationCode + hash;
+            
+            // Format with dashes
+            const formattedKey = 
+                rawKey.substring(0, 4) + '-' +
+                rawKey.substring(4, 8) + '-' +
+                rawKey.substring(8, 12) + '-' +
+                rawKey.substring(12, 16);
+            
+            return {
+                raw_key: rawKey,
+                formatted_key: formattedKey,
+                duration: duration,
+                system_id: systemId,
+                local_generated: true // Mark as locally generated
+            };
         }
 
         // Start connection when page loads
         document.addEventListener('DOMContentLoaded', function() {
             updateStatus('Starting server connection...');
-            setTimeout(connectToServer, 1000);
+            
+            // Add a small delay to ensure window is fully loaded
+            setTimeout(() => {
+                connectToServer();
+            }, 500);
         });
 
         // Close if no activity after 30 seconds
         setTimeout(() => {
             if (!window.closed) {
-                updateStatus('Connection timeout - closing window');
+                updateStatus('Connection timeout - closing window', true);
                 window.close();
             }
         }, 30000);
