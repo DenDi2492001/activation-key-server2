@@ -1,8 +1,8 @@
 <?php
-header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Origin: https://dendi2492001.github.io');
 header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header('Access-Control-Allow-Credentials: true');
 
 // Preflight request handling
 if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
@@ -220,3 +220,4 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     echo json_encode(array('valid' => false, 'error' => 'Only POST and GET requests allowed'));
 }
 ?>
+
