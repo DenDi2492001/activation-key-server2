@@ -12,7 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
     exit(0);
 }
 
-// Configuration - CHANGE THIS SECRET KEY!
+// Configuration
 $secret_key = "DENDI_SECURE_KEY_2025_V2";
 $used_keys_file = "used_keys.json";
 $activation_logs = "activation_logs.json";
@@ -109,17 +109,7 @@ function validateActivationKey($system_id, $activation_key, $secret_key) {
             'M' => '1month', 
             'Q' => '3months',
             'H' => '6months',
-            'Y' => '12months',
-            '1' => '12months',
-            '6' => '6months',
-            '3' => '3months',
-            'A' => '12months',
-            'B' => '12months',
-            'C' => '6months',
-            'D' => '6months',
-            'E' => '3months',
-            'F' => '3months',
-            'G' => '1month'
+            'Y' => '12months'
         );
         
         $duration = isset($duration_map[$duration_code]) ? $duration_map[$duration_code] : '2days';
@@ -211,7 +201,28 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
     
 } elseif ($_SERVER['REQUEST_METHOD'] == 'GET') {
-    // Handle JSONP callback
+    // Handle JSONP callback for GET requests
+    if (isset($_GET['callback']) && isset($_GET['action']) && $_GET['action'] === 'generate') {
+        $callback = $_GET['callback'];
+        $system_id = isset($_GET['system_id']) ? trim($_GET['system_id']) : '';
+        $duration = isset($_GET['duration']) ? $_GET['duration'] : '';
+        $vendor_password = isset($_GET['vendor_password']) ? $_GET['vendor_password'] : '';
+        
+        $valid_vendor_password = "VENDOR123";
+        
+        if ($vendor_password === $valid_vendor_password && !empty($system_id) && !empty($duration)) {
+            $result = generateActivationKey($system_id, $duration, $secret_key);
+            $response = array('success' => true, 'data' => $result);
+        } else {
+            $response = array('success' => false, 'error' => 'Invalid parameters or unauthorized');
+        }
+        
+        header('Content-Type: application/javascript');
+        echo $callback . '(' . json_encode($response) . ');';
+        exit;
+    }
+    
+    // Handle JSONP status check
     if (isset($_GET['callback'])) {
         $callback = $_GET['callback'];
         $data = array(
